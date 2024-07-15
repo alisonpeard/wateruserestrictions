@@ -1,3 +1,4 @@
+"---- Notes ----"
 rm(list=ls())
 library(dplyr)
 library(glarma)
@@ -14,14 +15,31 @@ wdir <- paste0(bdir, '/Documents/RAPID/correlation-analysis')
 data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
 res.dir <- paste0(wdir, '/data/results')
 
+ensemblewise <- function(fun, df, column, ...) {
+  ensembles <- unique(df$ensemble)
+  dfs <- vector("list", length(ensembles))
+  for (i in seq_along(ensembles)) {
+    df.ens <- df[df$ensemble == ensembles[i], ]
+    df.ens <- fun(df.ens, column, ...)
+    dfs[[i]] <- df.ens
+  }
+  dfs <- do.call(rbind, dfs)
+  return(dfs)
+}
 decompose.column <- function(df, column){
   ts <- ts(df[[column]], frequency = 12)
   ts.decomp <- stl(ts, s.window='periodic')$time.series
   colnames(ts.decomp) <- c(paste0(column, '.seasonal'), paste0(column, '.trend'), paste0(column, '.remainder'))
-  return(data.frame(ts.decomp))
+  df <- cbind(df, data.frame(ts.decomp))
+  return(df)
 }
-lag.column <- function(df, column, k = 1){
+lag.column <- function(df, column, k=1){
   df[[paste0(column, '.lag', k)]] = dplyr::lag(df[[column]], k)
+  return(df)
+}
+movavg.column <- function(df, col, n, type){
+  col.ma <- movavg(df[[col]], n, type)
+  df$ma <- col.ma
   return(df)
 }
 cm.binary <- function(x, y){
@@ -78,30 +96,30 @@ NFOLDS <- 5
 set.seed(278)
 if(TRUE){
   INDICATORS <- c(USE.INDICATOR)
-  df.model <- na.omit(df[, c('LoS', 'RZ_ID', INDICATORS)])
-  df.model.test <- na.omit(df.test[, c('LoS', 'RZ_ID', INDICATORS)])
+  df.model <- na.omit(df[, c('LoS', 'RZ_ID', INDICATORS, 'ensemble')])
+  df.model.test <- na.omit(df.test[, c('LoS', 'RZ_ID', INDICATORS, 'ensemble')])
   df.model$LoS.binary <- as.numeric(df.model$LoS > 0)
   df.model.test$LoS.binary <- as.numeric(df.model.test$LoS > 0)
   p.hat <- mean(df.model$LoS.binary)
   
   for(INDICATOR in INDICATORS){
-    df.model <- cbind(df.model, decompose.column(df.model, INDICATOR))
-    df.model.test <- cbind(df.model.test, decompose.column(df.model.test, INDICATOR))
+    df.model <- ensemblewise(decompose.column, df.model, INDICATOR)
+    df.model.test <- ensemblewise(decompose.column, df.model.test, INDICATOR)
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.trend'))
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.seasonal'))
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.remainder'))
-  }
+  } # decompose
   for(INDICATOR in INDICATORS){
     for(k in 1:24){
-      df.model <- lag.column(df.model, INDICATOR, k)
-      df.model.test <- lag.column(df.model.test, INDICATOR, k)
+      df.model <- ensemblewise(lag.column, df.model, INDICATOR, k)
+      df.model.test <- ensemblewise(lag.column, df.model.test, INDICATOR, k)
       INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.lag', k))
     }
-  }
-  df.model <- lag.column(df.model, 'LoS', 1)
-  df.model.test <- lag.column(df.model.test, 'LoS', 1)
-  df.model$ma <- movavg(df.model[[USE.INDICATOR]], (12*4), type="s")
-  df.model.test$ma <- movavg(df.model.test[[USE.INDICATOR]], (12*4), type="s")
+  } # lag
+  df.model <- ensemblewise(lag.column, df.model, 'LoS', 1)
+  df.model.test <- ensemblewise(lag.column, df.model.test, 'LoS', 1)
+  df.model <- ensemblewise(movavg.column, df.model, USE.INDICATOR, (12*4), type="s")
+  df.model.test <- ensemblewise(movavg.column, df.model.test, USE.INDICATOR, (12*4), type="s")
   INDICATORS <- c(INDICATORS) 
   
   y <- cbind(1 - df.model$LoS.binary, df.model$LoS.binary)
@@ -110,7 +128,7 @@ if(TRUE){
   df.model.test$y.ber <- y.test
   df.sub <- na.omit(df.model[, c('y.ber', 'ma', INDICATORS)])
   df.sub.test <- na.omit(df.model.test[, c('y.ber', 'ma', INDICATORS)])
-  bernoulli.later <- df.sub.test # compare later
+  # bernoulli.later <- df.sub.test # compare later
   
   index <- rownames(df.sub)
   date <- as.Date(df.all[index,]$Date)
@@ -223,29 +241,30 @@ if(TRUE){
   results
 } # Bernoulli model for zeros
 if(TRUE){
+  # grab train and test sets
   INDICATORS <- c(USE.INDICATOR)
-  df.model <- na.omit(df[, c('LoS', INDICATORS, 'n')])
-  df.model.test <- na.omit(df.test[, c('LoS', INDICATORS, 'n')])
+  df.model <- na.omit(df[, c('LoS', INDICATORS, 'n', 'ensemble')])
+  df.model.test <- na.omit(df.test[, c('LoS', INDICATORS, 'n', 'ensemble')])
   
   # calculate lags and decomposition BEFORE removing zeros
   for(INDICATOR in INDICATORS){
-    df.model <- cbind(df.model, decompose.column(df.model, INDICATOR))
-    df.model.test <- cbind(df.model.test, decompose.column(df.model.test, INDICATOR))
+    df.model <- ensemblewise(decompose.column, df.model, INDICATOR)
+    df.model.test <- ensemblewise(decompose.column, df.model.test, INDICATOR)
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.trend'))
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.seasonal'))
     INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.remainder'))
-  }
+  } # decompose
   for(INDICATOR in INDICATORS){
     for(k in 1:24){
-      df.model <- lag.column(df.model, INDICATOR, k)
-      df.model.test <- lag.column(df.model.test, INDICATOR, k)
+      df.model <- ensemblewise(lag.column, df.model, INDICATOR, k)
+      df.model.test <- ensemblewise(lag.column, df.model.test, INDICATOR, k)
       INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.lag', k))
     }
-  }
-  df.model <- lag.column(df.model, 'LoS', 1)
-  df.model.test <- lag.column(df.model.test, 'LoS', 1)
-  df.model$ma <- movavg(df.model[[USE.INDICATOR]], (12*4), type="s")
-  df.model.test$ma <- movavg(df.model.test[[USE.INDICATOR]], (12*4), type="s")
+  } # lag
+  df.model <- ensemblewise(lag.column, df.model, 'LoS', 1)
+  df.model.test <- ensemblewise(lag.column, df.model.test, 'LoS', 1)
+  df.model <- ensemblewise(movavg.column,  df.model, USE.INDICATOR, (12*4), type="s")
+  df.model.test <- ensemblewise(movavg.column, df.model.test, USE.INDICATOR, (12*4), type="s")
   
   # binomial MLE
   df.model$MLE <- df.model$LoS / df.model$n
@@ -381,27 +400,26 @@ if(TRUE){
 if(TRUE){
   if(TRUE){
     INDICATORS <- c(USE.INDICATOR)
-    df.model.test <- na.omit(df.all[, c('LoS', 'RZ_ID', INDICATORS, 'n')])
+    df.model.test <- na.omit(df.all[, c('LoS', 'RZ_ID', INDICATORS, 'n', 'ensemble')])
     df.model.test$LoS.binary <- as.numeric(df.model.test$LoS > 0)
     for(INDICATOR in INDICATORS){
-      df.model.test <- cbind(df.model.test, decompose.column(df.model.test, INDICATOR))
+      df.model.test <-ensemblewise(decompose.column, df.model.test, INDICATOR)
       INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.trend'))
       INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.seasonal'))
       INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.remainder'))
     }
     for(INDICATOR in INDICATORS){
       for(k in 1:24){
-        df.model.test <- lag.column(df.model.test, INDICATOR, k)
+        df.model.test <- ensemblewise(lag.column, df.model.test, INDICATOR, k)
         INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.lag', k))
-        lines(df.model[[paste0('si6.lag', k)]], col='blue')
       }
     }
+    df.model.test <- ensemblewise(movavg.column, df.model.test, USE.INDICATOR, (12*4), "s")
     y.bin <- cbind(df.model.test$n - df.model.test$LoS, df.model.test$LoS)
-    df.bin <- df.model.test[, c('LoS', 'RZ_ID', INDICATORS, 'n')]
+    df.bin <- df.model.test[, c('LoS', 'RZ_ID', INDICATORS, 'ma', 'n')]
     df.bin$y <- y.bin
-    df.bin$ma <- movavg(df.bin[[USE.INDICATOR]], (12*4), type="s")
     df.bin.sub <- na.omit(df.bin[, c('y', 'ma', INDICATORS, 'n')])
-  } # prep data
+  } # prep data
   if(TRUE){
     # already have mu.ber for whole time series so only need to make mu.bin
     if(LASSO.BINOMIAL){
@@ -453,7 +471,7 @@ if(TRUE){
       geom_point(aes(y=y[,1], x=date), col='black', pch=20) +
       xlab("Year") + ylab("LoS Days") + 
       ggtitle('Binomial predictions on test set')
-  } # plot (big!)
+  } # plot (expensive!)
   score.rmse <- sqrt(mean((df.preds$y[,2] - df.preds$q50)^2))
   score.r2 <- cor(df.preds$y[,2], df.preds$q50)^2
   print(paste0("RMSE: ", round(score.rmse, 6)))
@@ -462,8 +480,7 @@ if(TRUE){
   results['zibi.r2'] <- round(score.r2, 4)
 } # predict ZABI
 results['indicator'] <- USE.INDICATOR
-write.csv(results, paste0(res.dir, '/cv_glmnet/', USE.INDICATOR,
-                          '_fits', ENSEMBLE, '.csv'))
+write.csv(results, paste0(res.dir, '/cv_glmnet/', USE.INDICATOR, '_fits', ENSEMBLE, '.csv'))
 
 if(TRUE){
   look.at <- 'FF1'
