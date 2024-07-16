@@ -75,12 +75,16 @@ qZABI <- function(p, n, mu, nu){
   return(q.zabi)
 }
 
-# load data
+# settings
+WRZ = "ruthamford_north"
+RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22)
+RZ_ID = RZ_IDs[[WRZ]]
 SCENARIO <- 'ff'
+
+# load data
 path <- paste0(data.dir, '/', SCENARIO, '/ts_with_levels.csv')
 df.all <- read.csv(paste0(path))
 df.all <- na.omit(df.all)
-RZ_ID = 117 # London
 df.all <- df.all[df.all$RZ_ID == RZ_ID,]
 df.all$n <- lubridate::days_in_month(df.all$Date)
 
@@ -284,7 +288,7 @@ if(TRUE){
   regressors <- c(cols, 'ma')
   if(LASSO.BINOMIAL){
     LAMBDA <- 'lambda.min'
-    try(bin.mod <- cv.glmnet(as.matrix(df.sub[,regressors]), df.sub$y, family='binomial', nfolds=NFOLDS))
+    try(bin.mod <- cv.glmnet(as.matrix(df.sub[,regressors]), df.sub$y, family="binomial", nfolds=NFOLDS))
     mu <- predict(bin.mod, newx=as.matrix(df.sub[,regressors]), type='response', s=LAMBDA)
     mu.bin <- predict(bin.mod, newx=as.matrix(df.sub.test[,regressors]), type='response', s=LAMBDA)
     coefs <- as.data.frame(as.matrix(coef(bin.mod, s=LAMBDA)))
@@ -308,7 +312,7 @@ if(TRUE){
   } # fitting without LASSO
   if(TRUE){
     # view fit
-    bd <- df.model$n
+    bd <- df.sub$n
     q50 <- qBI(0.5, bd, mu)
     lower <- qBI(0.05, bd, mu)
     upper <- qBI(0.95, bd, mu)
@@ -325,7 +329,7 @@ if(TRUE){
     df.sub$date <- date
     
     # NAs for missing dates
-    df.plot <- data.frame(date = date, q50=q50, lower=lower, upper=upper, y=y[,2])
+    df.plot <- data.frame(date=date, q50=q50, lower=lower, upper=upper, y=df.sub$y[,2])
     df.plot <- merge(all.dates, df.plot, by = "date", all.x = TRUE)
     
     # CI polygons
@@ -480,7 +484,7 @@ if(TRUE){
   results['zibi.r2'] <- round(score.r2, 4)
 } # predict ZABI
 results['indicator'] <- USE.INDICATOR
-write.csv(results, paste0(res.dir, '/cv_glmnet/', USE.INDICATOR, '_fits', ENSEMBLE, '.csv'))
+write.csv(results, paste0(res.dir, '/final_model/', WRZ, '_', USE.INDICATOR, '_fits', ENSEMBLE, '.csv'))
 
 if(TRUE){
   look.at <- 'FF1'

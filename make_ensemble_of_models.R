@@ -90,12 +90,12 @@ df.all <- df.all[df.all$RZ_ID == RZ_ID,]
 
 # training subset by ensemble
 LASSO.BINOMIAL <- TRUE
+FAMILY <- "binomial"
 verbose <- TRUE # display all metrics
 NFOLDS <- 20 # change to 10 later to reduce std
 #UPPER.COEF <- 0 # don't allow positive relationship between rain and WUR
 set.seed(2)
-glmnet.control(mxitnr=100)
-for(run in seq(1, 99, 10)){
+for(run in seq(1, 99)){
   print(paste0("Training on ensemble member: ", toupper(SCENARIO), run))
   SEED <- sample(1:999, 1)
   set.seed(SEED)
@@ -116,7 +116,7 @@ for(run in seq(1, 99, 10)){
     USE.INDICATOR <- all.indicators[i]
     print(paste0("Fitting ", USE.INDICATOR))
     
-    if(TRUE){
+    if(TRUE){ # Bernoulli
       INDICATORS <- c(USE.INDICATOR)
       df.model <- na.omit(df[, c('LoS', 'RZ_ID', INDICATORS, 'ensemble')])
       df.model.test <- na.omit(df.test[, c('LoS', 'RZ_ID', INDICATORS, 'ensemble')])
@@ -165,7 +165,7 @@ for(run in seq(1, 99, 10)){
       
       # fit with LASSO
       LAMBDA <- 'lambda.min'
-      try(ber.mod <- cv.glmnet(as.matrix(df.sub[,regressors]), df.sub$y.ber, family=binomial(), nfolds=NFOLDS))
+      try(ber.mod <- cv.glmnet(as.matrix(df.sub[,regressors]), df.sub$y.ber, family=FAMILY, nfolds=NFOLDS))
       if(!exists("ber.mod")){
         # skip modelling this indicator/ensemble member combination
         next
@@ -218,7 +218,7 @@ for(run in seq(1, 99, 10)){
       results <- merge(coefs, metrics)
       results
     } # Bernoulli model for zeros
-    if(TRUE){
+    if(TRUE){ # Binomial
       INDICATORS <- c(USE.INDICATOR)
       df.model <- na.omit(df[, c('LoS', INDICATORS, 'n', 'ensemble')])
       df.model.test <- na.omit(df.test[, c('LoS', INDICATORS, 'n', 'ensemble')])
@@ -268,7 +268,7 @@ for(run in seq(1, 99, 10)){
       # fitting with LASSO
       LAMBDA <- 'lambda.min'
       try(bin.mod <- cv.glmnet(as.matrix(df.sub[,regressors]), df.sub$y,
-                               family=binomial(), nfolds=NFOLDS, parallel=TRUE))
+                               family=FAMILY, nfolds=NFOLDS, parallel=TRUE))
       if(!exists("bin.mod")){
         warning(paste0("Error. Skipping modelling ", INDICATOR, " for ", ENSEMBLE, "."))
         next
@@ -338,7 +338,7 @@ for(run in seq(1, 99, 10)){
       results['bin.rmse'] <- round(score.rmse, 4)
       results['bin.r2'] <- round(score.r2, 4)
     } # binomial count model for WUR days
-    if(TRUE){
+    if(TRUE){ # ZABI predictions
       if(TRUE){ # prep data
         INDICATORS <- c(USE.INDICATOR)
         df.model.test <- na.omit(df.test[, c('LoS', 'RZ_ID', INDICATORS, 'n', 'ensemble')])
