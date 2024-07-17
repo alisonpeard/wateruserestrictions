@@ -78,8 +78,9 @@ brier.score <- function(p, y){
 }
 
 # load data
-WRZ = "london"
-RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22)
+WRZ = "severn_trent"
+RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22, # priority
+              affinity=1, lincolnshire=12, severn_trent=83, south_staffs=97)
 RZ_ID = RZ_IDs[[WRZ]]
 SCENARIO <- 'ff'
 MAXLAG <- 24
@@ -91,20 +92,21 @@ df.all <- df.all[df.all$RZ_ID == RZ_ID,]
 # training subset by ensemble
 LASSO.BINOMIAL <- TRUE
 FAMILY <- "binomial"
-verbose <- TRUE # display all metrics
-NFOLDS <- 20 # change to 10 later to reduce std
+verbose <- FALSE # display all metrics
+NFOLDS <- 10 # change to 10 later to reduce std
 #UPPER.COEF <- 0 # don't allow positive relationship between rain and WUR
 set.seed(2)
-for(run in seq(1, 99)){
-  print(paste0("Training on ensemble member: ", toupper(SCENARIO), run))
+for(run in seq(1, 10)){
+  print(paste0("Training with seed: ", run))
   SEED <- sample(1:999, 1)
   set.seed(SEED)
   
-  ENSEMBLE <- paste0(toupper(SCENARIO), run)
-  ENSEMBLES <- sapply(c(1:run), function(x) paste0(toupper(SCENARIO), x))
-  
-  df <- df.all[df.all$ensemble %in% ENSEMBLES,]
-  df.test <- df.all[!df.all$ensemble %in% ENSEMBLES,]
+  ENSEMBLE <- paste0(toupper(SCENARIO), 1)
+  df <- df.all[df.all$ensemble == ENSEMBLE,]
+  df.test <- df.all[df.all$ensemble != ENSEMBLE,]
+  #ENSEMBLES <- sapply(c(1:run), function(x) paste0(toupper(SCENARIO), x))
+  #df <- df.all[df.all$ensemble %in% ENSEMBLES,]
+  #df.test <- df.all[!df.all$ensemble %in% ENSEMBLES,]
   df$n <- lubridate::days_in_month(df$Date)
   df.test$n <- lubridate::days_in_month(df.test$Date)
   n <- nrow(df)

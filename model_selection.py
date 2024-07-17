@@ -13,7 +13,7 @@ def whitespace_remover(dataframe):
         else:
             pass
  
-wrz = 'london'
+wrz = 'ruthamford_north'
 datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv_glmnet/{wrz}/"
 #%%
 files = glob.glob(os.path.join(datadir, "fits*.csv"))
@@ -37,23 +37,36 @@ df = pd.concat(dfs)
 df = df.reset_index()
 df = df.rename(columns={'index': 'indicator'})
 # %%
-fig, axs = plt.subplots(1, 4, figsize=(20, 5))
+fig, axs = plt.subplots(1, 4, figsize=(20, 4))
 
 violin_kws = {'palette': 'colorblind', 'linewidth': .5}
 
+ax = axs[0]
 df_plot = df.melt(id_vars='indicator', value_vars=['BCE', 'Brier'], var_name='Binary metric')
-sns.violinplot(data=df_plot, x='indicator', y='value', hue='Binary metric', ax=axs[0], **violin_kws)
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Binary metric', ax=ax, **violin_kws)
+ax.set_title('Binary metrics')
 
+ax = axs[1]
 df_plot = df.melt(id_vars='indicator', value_vars=['AUROC', 'Precision', 'Recall', 'F1', 'F2'], var_name='Confusion metric')
-sns.violinplot(data=df_plot, x='indicator', y='value', hue='Confusion metric', ax=axs[1], **violin_kws)
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Confusion metric', ax=ax, **violin_kws)
+ax.set_title('Confusion metrics')
 
+ax = axs[2]
 df_plot = df.melt(id_vars='indicator', value_vars=['zibi.r2'], var_name='R-squared')
-sns.violinplot(data=df_plot, x='indicator', y='value', hue='R-squared', legend=False, ax=axs[2], **violin_kws)
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='R-squared', legend=False, ax=ax, **violin_kws)
+ax.set_title(r'R$^2$')
 
+ax = axs[3] 
 df_plot = df.melt(id_vars='indicator', value_vars=['zibi.rmse'], var_name='RMSE')
-sns.violinplot(data=df_plot, x='indicator', y='value', hue='RMSE', legend=False, ax=axs[3], **violin_kws)
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='RMSE', legend=False, ax=ax, **violin_kws)
+ax.set_title('RMSE')
 
-plt.suptitle(f"ZABI model metrics for {wrz.title().replace('_', ' ')}")
+for ax in axs:
+    ax.set_ylabel("")
+    ax.set_xlabel("Indicator")
+    ax.set_xticks(ax.get_xticks(), ['SI6', 'SI12', 'SI24'])
+_
+plt.suptitle(f"ZABI metric distributions for {wrz.title().replace('_', ' ')}")
 del df_plot
 
 # %%
@@ -109,24 +122,26 @@ xlabels = [x.replace('ber.ma', 'Moving Avg') for x in xlabels]
 
 ylabels = [*df_avg.index]
 ylabels = [y.replace('_', ' ').title() for y in ylabels]
-ylabels
 
 # change plot style so there is no grid in the background
 sns.set_style("white")
 
 # set cmap center to 0
 cmap = 'bwr'
-vmin = min(df_avg[bernoulli].min().min(), df_avg[binomial].min().min())
-vmax = max(df_avg[bernoulli].max().max(), df_avg[binomial].max().max())
 cmap = sns.diverging_palette(220, 20, as_cmap=True)
-norm = plt.Normalize(vmin=vmin, vmax=vmax)
+
+# sort index
+df_avg.index = pd.CategoricalIndex(df_avg.index, categories=["si6", "si12", "si24"])
+df_avg.sort_index(level=0, inplace=True)
 
 # plot heatmaps
-fig, axs = plt.subplots(1, 2, figsize=(20, 6))
-sns.heatmap(df_avg[bernoulli].replace(0, np.nan), annot=True, ax=axs[0],
-            cmap=cmap, norm=norm, center=0, cbar_kws={'label': 'Coefficient'})
+fig, axs = plt.subplots(1, 2, figsize=(12, 4), sharey=True, sharex=True, layout='tight')
+im = sns.heatmap(df_avg[bernoulli].replace(0, np.nan), annot=True, ax=axs[0],
+            linewidths=.5, linecolor='k', 
+            cmap=cmap, center=0, cbar_kws={'label': 'Coefficient'})
 sns.heatmap(df_avg[binomial].replace(0, np.nan), annot=True, ax=axs[1],
-            cmap=cmap, norm=norm, center=0, cbar_kws={'label': 'Coefficient'})
+            linewidths=.5, linecolor='k',
+            cmap=cmap, center=0, cbar_kws={'label': 'Coefficient'})
 
 # labels
 axs[0].set_title("Bernoulli coefficients")
@@ -135,8 +150,12 @@ for ax in axs:
     ax.set_xlabel('Lag')
     ax.set_xticklabels(xlabels, rotation=45, ha='right')
     ax.set_yticklabels(ylabels, rotation=0)
+    ax.set_ylabel('Indicator')
     ax.label_outer()
-plt.suptitle(f"Averaged ZABI model coefficients for {wrz.title().replace('_', ' ')}")
+
+    for _, spine in ax.spines.items():
+        spine.set_visible(True)
+fig.suptitle(f"Averaged ZABI model coefficients for {wrz.title().replace('_', ' ')}")
 
 # %% ---- Distribution of coefficients for indicators ----
 INDICATOR = 'si12'
@@ -148,6 +167,7 @@ df_plot['coeff'] = df_plot['Coefficient'].str.split('.').str[1]
 fig, ax = plt.subplots(figsize=(12, 2))
 
 sns.violinplot(data=df_plot, x='coeff', y='value', hue='Model', ax=ax, linewidth=.1)
+ax.set_ylim([-1,1])
 plt.suptitle(f"ZABI model coefficients for {INDICATOR.upper()} for {wrz.title().replace('_', ' ')}")
 
 del df_plot
