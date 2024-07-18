@@ -78,7 +78,7 @@ brier.score <- function(p, y){
 }
 
 # load data
-WRZ = "severn_trent"
+WRZ = "south_staffs"
 RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22, # priority
               affinity=1, lincolnshire=12, severn_trent=83, south_staffs=97)
 RZ_ID = RZ_IDs[[WRZ]]

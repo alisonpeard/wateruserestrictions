@@ -13,7 +13,7 @@ def whitespace_remover(dataframe):
         else:
             pass
  
-wrz = 'ruthamford_north'
+wrz = 'south_staffs'
 datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv_glmnet/{wrz}/"
 #%%
 files = glob.glob(os.path.join(datadir, "fits*.csv"))
