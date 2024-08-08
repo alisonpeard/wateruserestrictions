@@ -213,12 +213,14 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   
   # predicted values
   test$ber.p <- ber$predicted$ber.p
-  test$bin.p <- merge(test, bin$predicted[,c('bin.p', 'bin.q50')], by=0, all.x=TRUE)$bin.q50
+  test$bin.p <- merge(test, bin$predicted[,c('bin.p', 'bin.q50')], by=0, all.x=TRUE)$bin.p
   test$bin.p[is.na(test$bin.p)] <- 0
   
   bd <- test$n
   mu.ber <- test$ber.p
   mu.bin <- test$bin.p
+  print(min(mu.bin))
+  print(max(mu.bin))
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
   lower <- qZABI(0.4, bd, mu.bin, mu.ber)
   upper <- qZABI(0.6, bd, mu.bin,  mu.ber)
