@@ -176,6 +176,7 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   train$bin.p <- mu
   
   # predicted values
+  bd <- test$n
   mu <- predict(model, newx=as.matrix(test[,X]), type='response')
   mu <- as.numeric(mu)
   q50 <- qBI(0.5, bd, mu)

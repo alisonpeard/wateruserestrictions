@@ -63,9 +63,9 @@ df$y.bin <- y.bin
 df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
 
 # training subset by ensemble
-ENSEMBLE <- paste0(toupper(SCENARIO), '72')
-train <- df[df$ensemble == ENSEMBLE,]
-test <- df[df$ensemble != ENSEMBLE,]
+ENSEMBLE <- paste0(toupper(SCENARIO), '80')
+train <- df[df$ensemble <= ENSEMBLE,]
+test <- df[df$ensemble > ENSEMBLE,]
 n <- nrow(train)
 
 # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
@@ -73,6 +73,7 @@ regressors <- c('si6.trend', sapply(windows, function(x){paste0('si6.trend.ma.r'
 #regressors <- c('si6.trend', 'si6.trend.ma.s2', 'si6.trend.ma.s12', 'si6.trend.ma.s48')
 res <- zabi.glm(train, test, label='si6', X=regressors)
 stargazer(res$summary, type='text')
+
 # ----Results----
 if(TRUE){
   look.at <- ENSEMBLE
@@ -101,7 +102,7 @@ if(TRUE){
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot fit
 if(TRUE){
-  look.at <- 'FF1'
+  look.at <- 'FF40'
   preds <- res$predicted
   preds.subset <- preds[preds$ensemble == look.at,]
   preds.subset$y <- preds.subset$y.bin
