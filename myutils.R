@@ -217,6 +217,8 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   test$bin.p[is.na(test$bin.p)] <- 0
   
   bd <- test$n
+  mu.ber <- test$ber.p
+  mu.bin <- test.bin.p
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
   lower <- qZABI(0.4, bd, mu.bin, mu.ber)
   upper <- qZABI(0.6, bd, mu.bin,  mu.ber)
