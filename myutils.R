@@ -45,18 +45,12 @@ make.conf.int <- function(df){
   conf.int <- conf.int[order(conf.int$group),]
   return(conf.int)
 }
-qZABI <- function(p, n, mu, nu){
-  q.bin <- qBI(p, 1, nu)
-  q.ber <- qBI(p, n, mu)
-  q.zabi <- c(q.bin * q.ber)
-  return(q.zabi)
-}
 
 # ----Metrics----
 bce <- function(y, p){
   y <- c(1 - y, y)
   p <- c(1 - p, p)
-  return(round(mean(y * log(p)), 4))
+  return(round(-mean(y * log(p)), 4))
 }
 brier <- function(y, p){
   bs <- mean((y - p)**2)
@@ -118,7 +112,8 @@ bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMB
   test <- test[,c("ensemble", "Date", y,X, 'n')]
   
   # fit model
-  model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family='binomial')
+  model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family='binomial',
+                     upper.limits=rep(0, length(regressors)))
   mu <- predict(model, newx=as.matrix(train[,X]), type='response', s=lambda)
   coefs <- as.data.frame(as.matrix(coef(model, s=lambda)))
   coef.names <- c('ber.intercept', lapply(X, function(x) paste0('ber.', x)))
@@ -159,7 +154,8 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   p.hat <- mean(MLE)
   
   # fit Binomial
-  model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family="binomial", nfolds=NFOLDS)
+  model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family="binomial",
+                     upper.limits=rep(0, length(regressors)), nfolds=NFOLDS)
   mu <- predict(model, newx=as.matrix(train[,X]), type='response', s=lambda)
   coefs <- as.data.frame(as.matrix(coef(model, s=LAMBDA)))
   coef.names <- c('bin.intercept', lapply(X, function(x) paste0('bin.', x)))
@@ -191,6 +187,12 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   
   return(list(fitted=train, predicted=test, summary=results))
 }
+qZABI <- function(p, n, mu, nu){
+  q.bin <- qBI(p, 1, nu)
+  q.ber <- qBI(p, n, mu)
+  q.zabi <- c(q.bin * q.ber)
+  return(q.zabi)
+}
 zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   ber <- bernoulli.glm(train, test, label='si6', X=regressors)
   bin <- binomial.glm(train, test, label='si6', X=regressors)
@@ -219,8 +221,6 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   bd <- test$n
   mu.ber <- test$ber.p
   mu.bin <- test$bin.p
-  print(min(mu.bin))
-  print(max(mu.bin))
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
   lower <- qZABI(0.4, bd, mu.bin, mu.ber)
   upper <- qZABI(0.6, bd, mu.bin,  mu.ber)

@@ -16,7 +16,7 @@ library(patchwork)
 library(stargazer)
 source("myutils.R")
 
-WRZ = "london"
+WRZ = "ruthamford_north"
 RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22)
 RZ_ID = RZ_IDs[[WRZ]]
 SCENARIO <- 'ff'
@@ -39,6 +39,7 @@ df$n <- lubridate::days_in_month(df$Date)
 df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATOR, 'ensemble', 'n', 'Date')])
 
 # add moving average and decomposition terms
+# Triangular MA: https://www.tradingview.com/script/MRkaCrh9-Triangular-Moving-Average/
 INDICATORS <- c(INDICATOR)
 windows <- c(2, 3, 6, 9, 12, 24, 36, 48) # length of MA windows (in months) 
 types <- c("s", "t", "m", "e", "r")
@@ -63,20 +64,19 @@ df$y.bin <- y.bin
 df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
 
 # training subset by ensemble
-ENSEMBLE <- paste0(toupper(SCENARIO), '80')
+ENSEMBLE <- paste0(toupper(SCENARIO), '1')
 train <- df[df$ensemble <= ENSEMBLE,]
 test <- df[df$ensemble > ENSEMBLE,]
 n <- nrow(train)
 
 # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
-regressors <- c('si6.trend', sapply(windows, function(x){paste0('si6.trend.ma.r', x)}))
+regressors <- c('si6.trend', sapply(windows, function(x){paste0(INDICATOR, '.ma.t', x)}))
 #regressors <- c('si6.trend', 'si6.trend.ma.s2', 'si6.trend.ma.s12', 'si6.trend.ma.s48')
-res <- zabi.glm(train, test, label='si6', X=regressors)
-stargazer(res$summary, type='text')
+res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
 
 # ----Results----
 if(TRUE){
-  look.at <- ENSEMBLE
+  look.at <- 'FF1'#ENSEMBLE
   preds <- res$fitted
   preds.subset <- preds[preds$ensemble == look.at,]
   preds.subset$y <- preds.subset$y.bin
@@ -102,7 +102,7 @@ if(TRUE){
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot fit
 if(TRUE){
-  look.at <- 'FF40'
+  look.at <- 'FF72'
   preds <- res$predicted
   preds.subset <- preds[preds$ensemble == look.at,]
   preds.subset$y <- preds.subset$y.bin
@@ -127,3 +127,4 @@ if(TRUE){
     xlab("Year") + ylab("SPI 6")
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot predictions
+stargazer(res$summary, type='text')
