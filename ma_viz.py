@@ -13,7 +13,7 @@ def whitespace_remover(dataframe):
         else:
             pass
  
-wrz = 'ruthamford_north'
+wrz = 'lincolnshire'
 datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv_glmnet/{wrz}/"
 si6 = pd.read_csv(os.path.join(datadir, "mafits__si6.trendFF1.csv"), index_col=0, skipinitialspace=True)
 si12 = pd.read_csv(os.path.join(datadir, "mafits__si12.trendFF1.csv"), index_col=0, skipinitialspace=True)
@@ -78,6 +78,8 @@ df_std = df_std.round(4)
 df_q25 = df_q25.round(4)
 df_q75 = df_q75.round(4)
 
+df_avg.to_csv(os.path.join(datadir, "mafits__avg.csv"))
+
 # %% ---- Heatmaps of coefficients ----
 # prep for aesthetics
 xlabels = df.columns
@@ -98,7 +100,6 @@ cmap = sns.diverging_palette(220, 20, as_cmap=True)
 # sort index
 df_avg.index = pd.CategoricalIndex(df_avg.index, categories=["si6", "si12", "si24"])
 df_avg.sort_index(level=0, inplace=True)
-
 
 # plot heatmaps
 fig, axs = plt.subplots(1, 2, figsize=(10, 4), sharey=True, sharex=True, layout='tight')
