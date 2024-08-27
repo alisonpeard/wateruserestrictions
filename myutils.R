@@ -24,7 +24,7 @@ decompose.column <- function(df, column='si6'){ # BUG!
   return(df)
 }
 lag.column <- function(df, column, k=1){
-  df[[paste0(column, '.lag', k)]] = dplyr::lag(df[[column]], k)
+  df[[paste0(column, '.lag.', k)]] = dplyr::lag(df[[column]], k)
   return(df)
 }
 movavg.column <- function(df, col, n, type){
@@ -53,7 +53,7 @@ bce <- function(y, p){
   return(round(-mean(y * log(p)), 4))
 }
 brier <- function(y, p){
-  bs <- mean((y - p)**2)
+  bs <- mean((p - y)**2)
   return(round(bs, 4))
 }
 confusion <- function(y, f){

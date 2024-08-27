@@ -39,14 +39,15 @@ df$n <- lubridate::days_in_month(df$Date)
 df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATOR, 'ensemble', 'n', 'Date')])
 
 # add moving average and decomposition terms
-# Triangular MA: https://www.tradingview.com/script/MRkaCrh9-Triangular-Moving-Average/
 INDICATORS <- c(INDICATOR)
 windows <- c(2, 3, 6, 9, 12, 24, 36, 48) # length of MA windows (in months) 
 types <- c("s", "t", "m", "e", "r")
-for(INDICATOR in INDICATORS){ # decompose
-  df <- ensemblewise(decompose.column, df, INDICATOR)
-  INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.trend'))
-} # decompose
+if(FALSE){
+  for(INDICATOR in INDICATORS){ # decompose
+    df <- ensemblewise(decompose.column, df, INDICATOR)
+    INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.trend'))
+  } # decompose
+}
 for(INDICATOR in INDICATORS){ # moving average
   for(i in seq_along(windows)){ 
     for(j in seq_along(types)){
@@ -70,8 +71,7 @@ test <- df[df$ensemble > ENSEMBLE,]
 n <- nrow(train)
 
 # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
-regressors <- c('si6.trend', sapply(windows, function(x){paste0(INDICATOR, '.ma.t', x)}))
-#regressors <- c('si6.trend', 'si6.trend.ma.s2', 'si6.trend.ma.s12', 'si6.trend.ma.s48')
+regressors <- c('si6', sapply(windows, function(x){paste0(INDICATOR, '.ma.s', x)}))
 res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
 
 # ----Results----
@@ -97,8 +97,8 @@ if(TRUE){
     scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   p2 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=si6)) +
-    xlab("Year") + ylab("SPI 6")
+    geom_line(aes(x=Date, y=get(INDICATOR))) +
+    xlab("Year") + ylab(toupper(INDICATOR))
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot fit
 if(TRUE){
@@ -123,8 +123,8 @@ if(TRUE){
     scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   p2 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=si6)) +
-    xlab("Year") + ylab("SPI 6")
+    geom_line(aes(x=Date, y=get(INDICATOR))) +
+    xlab("Year") + ylab(toupper(INDICATOR))
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot predictions
-stargazer(res$summary, type='text')
+stargazer(res$summary, type='text') # evaluation metrics
