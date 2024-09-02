@@ -13,6 +13,7 @@ Output files:
 """
 #%%
 import os
+import json
 os.environ['USE_PYGEOS'] = '0'
 import glob
 import numpy as np
@@ -20,7 +21,6 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
-import utils
 
 plot_kwargs = {'bbox_inches': "tight", 'dpi': 200}
 
@@ -37,8 +37,15 @@ def subset_column(df, column, value):
     df = df.drop(columns=[column])
     return df
 
+def load_config(dirname=None):
+    if dirname is None:
+        dirname = os.getcwd()
+    config_path = os.path.join(dirname, "config.json")
+    with open(config_path, "r") as config_fh:
+        config = json.load(config_fh)
+    return config
 
-config = utils.load_config()
+config = load_config("..")
 tempdir = config['paths']['tempdir']
 resdir = config['paths']['resultsdir']
 outdir = config['paths']['resultsdir']
@@ -50,6 +57,7 @@ VARIABLE = 'ep' # ['ep', 'prbc'], can't remember what prbc was for
 # load indicator data
 df_ind = pd.read_parquet(os.path.join(tempdir, 'indicators', SCENARIO, 'indicator_series.parquet'))
 df_spi = pd.read_parquet(os.path.join(tempdir, 'indicators', SCENARIO, 'standardised_series.parquet'))
+
 #%%
 df_ind = subset_column(df_ind, 'Variable', VARIABLE)
 df_ind = subset_column(df_ind, 'scenario', SCENARIO.upper())
