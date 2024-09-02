@@ -156,6 +156,7 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   # fit Binomial
   model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family="binomial",
                      upper.limits=rep(0, length(regressors)), nfolds=NFOLDS)
+  
   mu <- predict(model, newx=as.matrix(train[,X]), type='response', s=lambda)
   coefs <- as.data.frame(as.matrix(coef(model, s=LAMBDA)))
   coef.names <- c('bin.intercept', lapply(X, function(x) paste0('bin.', x)))

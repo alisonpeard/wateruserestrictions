@@ -13,25 +13,82 @@ def whitespace_remover(dataframe):
         else:
             pass
  
-wrz = 'lincolnshire'
-datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv_glmnet/{wrz}/"
-si6 = pd.read_csv(os.path.join(datadir, "mafits__si6.trendFF1.csv"), index_col=0, skipinitialspace=True)
-si12 = pd.read_csv(os.path.join(datadir, "mafits__si12.trendFF1.csv"), index_col=0, skipinitialspace=True)
-si24 = pd.read_csv(os.path.join(datadir, "mafits__si24.trendFF1.csv"), index_col=0, skipinitialspace=True)
-si6['indicator'] = 'si6'
-si12['indicator'] = 'si12'
-si24['indicator'] = 'si24'
+wrz = 'london'
+trend = 'raw'
+lag = 'ma.s'
+scenario = 'FF2'
+datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv/{wrz}/{trend}"
 
-colnames = si6.columns
-colnames = [x.replace('.si6.trend', '') for x in colnames]
+binary_metrics = ['BCE', 'Brier']
+confusion_metrics = ['Precision', 'Recall', 'F1', 'F2']
+regression_metrics = ['RMSE']
 
-si6.columns = colnames
-si12.columns = colnames
-si24.columns = colnames
+# %%
+dfs = []
+toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.si12', '.si24']
+ind_rename = {'ep_total': 'EP', 'si6': 'SI6', 'si12': 'SI12', 'si24': 'SI24'}
+trend_rename = {'trend': 'Yes', 'raw': 'No'}
+lag_rename = {'lag.': 'Pointwise', 'ma.s': 'Simple MA', 'ma.t': 'Triangular MA'}
+for root, dirs, files in os.walk(datadir):
+    for file in files:
+        if root.endswith(lag) and file.endswith(f"{scenario}.csv"):
+            df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
 
-df = pd.concat([si6, si12, si24])
-df.columns = colnames
-df.groupby('indicator').mean()
+            columns = df.columns
+            for r in toremove:
+                columns = [x.replace(r, '') for x in columns]
+            df.columns = columns
+
+            # df['lag'] = lag_rename[root.split('/')[-1]]
+            df['indicator'] = root.split('/')[-2]
+            # df['trend'] = trend_rename[root.split('/')[-3]]
+            # df['wrz'] = root.split('/')[-4].title()
+            dfs.append(df)
+df = pd.concat(dfs).reset_index(drop=True).dropna()
+df = df
+df.groupby(['indicator']).mean()
+# fix order
+df = df.set_index('indicator').loc[['ep_total', 'si6', 'si12', 'si24']].reset_index(drop=False)
+
+# %% gridspec test
+# Create a figure
+from matplotlib.gridspec import GridSpec
+
+violin_kws = {'palette': 'colorblind', 'linewidth': .5}
+
+fig = plt.figure(figsize=(12, 6))
+gs = GridSpec(2, 3, figure=fig, width_ratios=[1, 1, 2])
+ax1 = fig.add_subplot(gs[0, 0])
+ax2 = fig.add_subplot(gs[1, 0])
+ax3 = fig.add_subplot(gs[0, 1])
+ax4 = fig.add_subplot(gs[1, 1])
+ax5 = fig.add_subplot(gs[:, 2])
+axs = [ax1, ax2, ax3, ax4, ax5]
+
+ax = ax1
+df_plot = df.melt(id_vars='indicator', value_vars='BCE', var_name='Metric')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
+ax.set_title('Binary metrics')
+ax = ax2
+df_plot = df.melt(id_vars='indicator', value_vars='Brier', var_name='Metric')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
+
+ax = ax3
+df_plot = df.melt(id_vars='indicator', value_vars='Precision', var_name='Metric')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
+ax.set_title('Confusion metrics')
+ax = ax4
+df_plot = df.melt(id_vars='indicator', value_vars=['Recall', 'F1', 'F2'], var_name='Metric')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
+
+ax = ax5
+df_plot = df.melt(id_vars='indicator', value_vars='RMSE', var_name='Metric')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
+ax.set_title('Regression metrics')
+
+for ax in axs:
+    # ax.label_outer()
+    pass
 
 # %% Violin plots of metrics
 fig, axs = plt.subplots(1, 3, figsize=(16, 4))
@@ -39,20 +96,17 @@ fig, axs = plt.subplots(1, 3, figsize=(16, 4))
 violin_kws = {'palette': 'colorblind', 'linewidth': .5}
 
 ax = axs[0]
-binary_metrics = ['BCE', 'Brier']
 df_plot = df.melt(id_vars='indicator', value_vars=binary_metrics, var_name='Binary metric')
 sns.violinplot(data=df_plot, x='indicator', y='value', hue='Binary metric', ax=ax, **violin_kws)
 ax.set_title('Binary metrics')
 
 ax = axs[1]
 # note 'AUROC' removed because inflated by class imbalance
-confusion_metrics = ['Precision', 'Recall', 'F1', 'F2']
 df_plot = df.melt(id_vars='indicator', value_vars=confusion_metrics, var_name='Confusion metric')
 sns.violinplot(data=df_plot, x='indicator', y='value', hue='Confusion metric', ax=ax, **violin_kws)
 ax.set_title('Confusion metrics')
 
 ax = axs[2] 
-regression_metrics = ['RMSE']
 df_plot = df.melt(id_vars='indicator', value_vars=regression_metrics, var_name='RMSE')
 sns.violinplot(data=df_plot, x='indicator', y='value', hue='RMSE', legend=False, ax=ax, **violin_kws)
 ymin, ymax = df_plot['value'].min(), df_plot['value'].max()
@@ -62,7 +116,7 @@ ax.set_title('RMSE')
 for ax in axs:
     ax.set_ylabel("")
     ax.set_xlabel("Indicator")
-    ax.set_xticks(ax.get_xticks(), ['SI6', 'SI12', 'SI24'])
+    ax.set_xticks(ax.get_xticks(), ['EP', 'SI6', 'SI12', 'SI24'])
 
 plt.suptitle(f"ZABI metric distributions for {wrz.title().replace('_', ' ')}")
 # del df_plot
@@ -98,7 +152,7 @@ cmap = 'bwr'
 cmap = sns.diverging_palette(220, 20, as_cmap=True)
 
 # sort index
-df_avg.index = pd.CategoricalIndex(df_avg.index, categories=["si6", "si12", "si24"])
+df_avg.index = pd.CategoricalIndex(df_avg.index, categories=["ep_total", "si6", "si12", "si24"])
 df_avg.sort_index(level=0, inplace=True)
 
 # plot heatmaps
@@ -124,19 +178,4 @@ for ax in axs:
         spine.set_visible(True)
 fig.suptitle(f"Averaged ZABI model coefficients for {wrz.title().replace('_', ' ')}")
 
-# %% ---- Distribution of coefficients for indicators ----
-INDICATOR = 'si6'
-df_plot = df[df['indicator'] == INDICATOR]
-df_plot = df_plot.melt(id_vars=['indicator'], value_vars=bernoulli+binomial, var_name='Coefficient')
-df_plot['Model'] = df_plot['Coefficient'].str.split('.').str[0].str.title()
-df_plot['coeff'] = df_plot['Coefficient'].apply(lambda x: '.'.join(x.split('.')[1:]))
-
-fig, ax = plt.subplots(figsize=(12, 2))
-
-sns.violinplot(data=df_plot, x='coeff', y='value', hue='Model', ax=ax, linewidth=.1)
-# ax.set_ylim([-1,1])
-ax.set_xticklabels(xlabels, rotation=45, ha='right')
-plt.suptitle(f"ZABI model coefficients for {INDICATOR.upper()} for {wrz.title().replace('_', ' ')}")
-
-# del df_plot
 # %%
