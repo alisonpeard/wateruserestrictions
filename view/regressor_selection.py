@@ -22,7 +22,7 @@ for root, dirs, files in os.walk(ensembledir):
     for file in files:
         if file.endswith("FF2.csv"):
             df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
-            df = df.replace('NA', np.nan)
+            df = df.replace('NA', pd.NA)
             columns = df.columns
             for r in toremove:
                 columns = [x.replace(r, '') for x in columns]
