@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import dataframe_image as dfi
 
-# %%
 wd = os.path.join(os.path.expanduser("~"), "Documents", "RAPID", "correlation-analysis")
 datadir = os.path.join(wd, "data", "results")
 ensembledir = os.path.join(datadir, "cv", "london")
@@ -21,9 +20,9 @@ lag_rename = {'lag.': 'Pointwise', 'ma.s': 'Simple MA', 'ma.t': 'Triangular MA'}
 
 for root, dirs, files in os.walk(ensembledir):
     for file in files:
-        if file.endswith("FF1.csv"):
+        if file.endswith("FF2.csv"):
             df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
-            
+            df = df.replace('NA', np.nan)
             columns = df.columns
             for r in toremove:
                 columns = [x.replace(r, '') for x in columns]
@@ -36,7 +35,8 @@ for root, dirs, files in os.walk(ensembledir):
             df['WRZ'] = root.split('/')[-4].title()
             dfs.append(df)
 
-df = pd.concat(dfs).reset_index(drop=True).dropna()
+df = pd.concat(dfs).reset_index(drop=True)#.dropna()
+
 df = df.groupby(['WRZ', 'Indicator', 'Trend', 'Lag type']).mean()[['BCE', 'Brier', 'AUROC', 'F1', 'RMSE']]# , 'Recall', 'Precision']]
 df = df.loc[:, ['EP', 'SI6', 'SI12', 'SI24'], :, :]
 df_styled = df.style.background_gradient(

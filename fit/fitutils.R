@@ -104,10 +104,15 @@ cts.metrics <- function(y, f, p, label='indicator'){
 }
 
 # ----Zero-adjusted Binomial model----
+qZABI <- function(p, n, mu, nu){
+  q.bin <- qBI(p, 1, nu)
+  q.ber <- qBI(p, n, mu)
+  q.zabi <- c(q.bin * q.ber)
+  return(q.zabi)
+}
 bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMBDA){
   bd <- 1
   p.hat <- mean(train[[y]])
-  
   train <- train[,c("ensemble", "Date", y,X, 'n')]
   test <- test[,c("ensemble", "Date", y,X, 'n')]
   
@@ -187,12 +192,6 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   results <- merge(coefs, metrics)
   
   return(list(fitted=train, predicted=test, summary=results))
-}
-qZABI <- function(p, n, mu, nu){
-  q.bin <- qBI(p, 1, nu)
-  q.ber <- qBI(p, n, mu)
-  q.zabi <- c(q.bin * q.ber)
-  return(q.zabi)
 }
 zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   ber <- bernoulli.glm(train, test, label='si6', X=regressors)

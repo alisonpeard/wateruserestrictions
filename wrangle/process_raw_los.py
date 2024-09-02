@@ -18,19 +18,28 @@ os.environ['USE_PYGEOS'] = '0'
 import utils
 import pandas as pd
 
-config = utils.load_config()
+config = utils.load_config('..')
 tempdir = config['paths']['tempdir']
 datadir = config['paths']['datadir']
 outdir = config['paths']['tempdir']
 figdir = config['paths']['figdir']
 
-SCENARIO = "nf"
+SCENARIO = "ff"
 VERSION = '240403'
 print(outdir)
-#%%
-wrz_code = pd.read_excel(os.path.join(datadir, 'WRZ', 'wrz_code.xlsx'))
-wrz_code['RZ ID'] = pd.to_numeric(wrz_code['RZ ID'])
-wrz_dict = {wrz_code: f'{rz_id:.0f}' for wrz_code, rz_id in zip(wrz_code['WREW Code'], wrz_code['RZ ID'])}
+
+if True: # 02-09-2024
+    wrz_code = pd.read_excel(os.path.join(datadir, 'WRZ', 'wrz_code.xlsx'))
+    wrz_code['RZ ID'] = pd.to_numeric(wrz_code['RZ ID'])
+    wrz_dict = {wrz_code: f'{rz_id:.0f}' for wrz_code, rz_id in zip(wrz_code['WREW Code'], wrz_code['RZ ID'])}
+
+wrz_dict
+# %%
+if False: # 02-09-2024
+    import geopandas as gpd
+    wrz_code = gpd.read_file(os.path.join(datadir, 'WRZ', 'WRZ.shp'))
+    wrz_dict = {wrz_code: f'{rz_id:.0f}' for wrz_code, rz_id in zip(wrz_code['WRZ_NAME'], wrz_code['RZ_ID'])}
+wrz_dict
 #%%
 # Load the LoS data and process it
 dfs_binary = []
@@ -40,9 +49,10 @@ dfs_l3 = []
 dfs_l4 = []
 
 for ensemble in range(1, 101):
-    df = pd.read_csv(os.path.join(datadir, 'los', VERSION, SCENARIO.upper(),
-                                  f'National_Model__jobid_{ensemble}_nodal_globalPlotVars_selected.csv'),
-                                  header=1)
+    df = pd.read_csv(os.path.join(
+        datadir, 'los', VERSION, SCENARIO.upper(), f'National_Model__jobid_{ensemble}_nodal_globalPlotVars_selected.csv'),
+        header=1
+        )
     los_cols = [col for col in df.columns if "LoS" in col]
     df = df[['Year', 'Day'] + los_cols]
     df['Date'] = pd.to_datetime(df['Year'] * 1000 + df['Day'], format='%Y%j')
@@ -53,10 +63,10 @@ for ensemble in range(1, 101):
     df.columns = df.columns.map(wrz_dict)
     valid_columns = df.columns[(df.columns != 'nan') & (~df.columns.isnull())]
     df = df[valid_columns]
-    df.columns.name = "RZ ID"
-    df = df.groupby('RZ ID', axis=1).max() # aggregate all WRz
+    df.columns.name = "RZ_ID"
+    df = df.groupby('RZ_ID', axis=1).max() # aggregate all WRz
     df.columns = df.columns.astype(int)
-    df = df.sort_values(by='RZ ID', axis=1)
+    df = df.sort_values(by='RZ_ID', axis=1)
 
     # monthly counts
     df_binary = (df > 0).astype(int).groupby(pd.Grouper(freq="M")).agg(sum)
@@ -111,6 +121,7 @@ df_l2_melted = melt_los_df(df_l2)
 df_l3_melted = melt_los_df(df_l3)
 df_l4_melted = melt_los_df(df_l4)
 df_l4_melted.head()
+
 #%%
 # Save the melted dfs
 df_binary_melted.to_csv(os.path.join(outdir, VERSION, SCENARIO.lower(), 'monthly_los_level0_melted.csv'))
@@ -118,4 +129,7 @@ df_l1_melted.to_csv(os.path.join(outdir, VERSION, SCENARIO.lower(), 'monthly_los
 df_l2_melted.to_csv(os.path.join(outdir, VERSION, SCENARIO.lower(), 'monthly_los_level2_melted.csv'))
 df_l3_melted.to_csv(os.path.join(outdir, VERSION, SCENARIO.lower(), 'monthly_los_level3_melted.csv'))
 df_l4_melted.to_csv(os.path.join(outdir, VERSION, SCENARIO.lower(), 'monthly_los_level4_melted.csv'))
-# %% 
+
+# %% check we still have 99 WRZs
+print(df_binary_melted['RZ_ID'].nunique())
+assert df_binary_melted['RZ_ID'].nunique() == 99
