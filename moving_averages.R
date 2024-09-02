@@ -21,7 +21,7 @@ RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22)
 RZ_ID = RZ_IDs[[WRZ]]
 SCENARIO <- 'ff'
 WRZLABEL <- str_to_title(gsub("_", " ", WRZ))
-INDICATOR <- 'si6'
+INDICATOR <- 'si12'
 
 # setup env
 bdir <- '/Users/alison'
@@ -65,13 +65,13 @@ df$y.bin <- y.bin
 df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
 
 # training subset by ensemble
-ENSEMBLE <- paste0(toupper(SCENARIO), '1')
+ENSEMBLE <- paste0(toupper(SCENARIO), '2')
 train <- df[df$ensemble <= ENSEMBLE,]
 test <- df[df$ensemble > ENSEMBLE,]
 n <- nrow(train)
 
 # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
-regressors <- c('si6', sapply(windows, function(x){paste0(INDICATOR, '.ma.s', x)}))
+regressors <- c(INDICATOR, sapply(windows, function(x){paste0(INDICATOR, '.ma.s', x)}))
 res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
 
 # ----Results----

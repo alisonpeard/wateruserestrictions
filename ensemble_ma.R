@@ -34,9 +34,10 @@ res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
 SCENARIO <- 'ff'
-INDICATOR.BASE <- 'si6' # c('si6', 'si12', 'si24', 'ep_total')
-TREND.MODE <- 'raw' # c('trend', 'raw')
-LAG.MODE <- 'ma'            # c('lag', 'ma')
+ENSEMBLE <- paste0(toupper(SCENARIO), '2')
+INDICATOR.BASE <- 'si24'      # c('si6', 'si12', 'si24', 'ep_total')
+TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
+LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
 
 # subset rz_keys by what time series are available
@@ -47,7 +48,7 @@ rz_keys <- merge(rz_keys, df, by.y='RZ_ID', by.x='rz_id')
 rz_keys <- unique(rz_keys[c('rz_id', 'wrz')])
 
 # subset to London only for model selection
-# rz_keys <- rz_keys[rz_keys['rz_id'] == 117,]
+#rz_keys <- rz_keys[rz_keys['rz_id'] == 117,]
 
 # loop through water resource zones (and indicators)
 for(i in 1:nrow(rz_keys)){
@@ -107,7 +108,6 @@ for(i in 1:nrow(rz_keys)){
     df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
     
     # training subset by ensemble
-    ENSEMBLE <- paste0(toupper(SCENARIO), '1')
     train <- df[df$ensemble <= ENSEMBLE,]
     test <- df[df$ensemble > ENSEMBLE,]
     n <- nrow(train)
@@ -118,7 +118,7 @@ for(i in 1:nrow(rz_keys)){
     rows <- vector("list", K) 
     for(run in 1:K){
       # run = 1 # for dev
-      print(paste0("Training with seed: ", run))
+      print(paste0("Training with seed number: ", run))
       SEED <- sample(1:999, 1)
       set.seed(SEED)
       
@@ -126,6 +126,7 @@ for(i in 1:nrow(rz_keys)){
       regressors <- c(INDICATOR, sapply(windows, function(x){paste0(INDICATOR, '.', LAG.MODE, '.', TYPE, x)}))
       res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
       rows[[run]] <- res$summary
+      print(res$summary)
     }
     summary <- data.frame(do.call(rbind, rows))
     stargazer(summary, type='text')

@@ -8,37 +8,47 @@ import matplotlib.pyplot as plt
 
 wd = os.path.join(os.path.expanduser("~"), "Documents", "RAPID", "correlation-analysis")
 datadir = os.path.join(wd, "data", "results")
-wrz_folders = os.listdir(os.path.join(datadir, "cv_glmnet"))
+wrz_folders = os.listdir(os.path.join(datadir, "cv"))
 wrz_folders = [f for f in wrz_folders if not f.startswith(".")]
 
 # %% ----Average the metrics for each WRZ----
+training = 'FF2'
+trend = 'raw'
+lag = 'ma.s'
+toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.si12', '.si24']
+
 for folder in wrz_folders:
-    filedir = os.path.join(datadir, "cv_glmnet", folder)
+    filedir = os.path.join(datadir, "cv", folder)
     inds = []
     for ind in ['si6', 'si12', 'si24']:
         try:
-            si = pd.read_csv(os.path.join(filedir, f"mafits__{ind}.trendFF1.csv"), index_col=0, skipinitialspace=True)
+            si = pd.read_csv(os.path.join(filedir, trend, ind, lag, f"{training}.csv"), index_col=0, skipinitialspace=True)
             si['indicator'] = ind
-            colnames = si.columns
-            colnames = [x.replace(f'.{ind}.trend', '') for x in colnames]
 
-            si.columns = colnames
+            columns = si.columns
+            for r in toremove:
+                columns = [x.replace(r, '') for x in columns]
+            si.columns = columns
             inds.append(si)
+
         except FileNotFoundError:
             pass
     if len(inds) == 0:
         continue
+
     df = pd.concat(inds)
-    df.columns = colnames
     df_avg = df.groupby('indicator').mean()
+    df_avg = df_avg.loc[['si6', 'si12', 'si24']]
     df_avg.to_csv(os.path.join(filedir, "mafits__avg.csv"))
+
 
 # %% ----Read in the averaged metrics----
 fits = []
 for folder in wrz_folders:
-    files = glob(os.path.join(datadir, "cv_glmnet", folder, "mafits__avg.csv"))
+    files = glob(os.path.join(datadir, "cv", folder, "mafits__avg.csv"))
     fits += files
 fits
+
 # %%
 gdf = gpd.read_file(os.path.join(wd, "data", "input", 'WRZ', "WRZ.shp"))
 gdf['wrz'] = gdf['WRZ_NAME'].str.lower().replace(' ', '_', regex=True)
@@ -58,6 +68,7 @@ for f in fits:
     # df['wrz'] = f.split("/")[-2]
     dfs.append(df)
 df = pd.concat(dfs).reset_index(drop=False).dropna()
+
 # %%
 gdf = gpd.read_file(os.path.join(wd, "data", "input", 'WRZ', "WRZ.shp"))
 boundaries = gdf.set_geometry(gdf['geometry'].boundary).to_crs(4326)
@@ -68,30 +79,45 @@ gdf = gdf.to_crs(4326) # nicer plotting
 import cartopy
 import cartopy.crs as ccrs
 
-indicator = 'si6'
 cmap = 'YlOrRd'
+
+# subset by indicator
+indicator = 'si6'
 gdf_sub = gdf[gdf['indicator'] == indicator]
+# # subset by best
+# aggfunc = {
+#     'Brier': 'min',
+#     'BCE': 'min',
+#     'RMSE': 'min',
+#     'Precision': 'max',
+#     'Recall': 'max',
+#     'F1': 'max',
+#     'AUROC': 'max',
+#     'geometry': 'first'
+# }
+# gdf_sub = gdf.groupby(['RZ_ID']).agg(aggfunc).reset_index()
+# gdf_sub = gpd.GeoDataFrame(gdf_sub, geometry='geometry').set_crs(4326)
 
 fig, axs = plt.subplots(2, 3, figsize=(12, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
 ax = axs[0, 0]
-gdf.plot('Brier', ax=ax, legend=True, cmap=f"{cmap}_r")
+gdf_sub.plot('Brier', ax=ax, legend=True, cmap=f"{cmap}_r")
 ax.set_title('Brier Score')
 
 ax = axs[0, 1]
-gdf.plot('BCE', ax=ax, legend=True, cmap=f"{cmap}_r")
+gdf_sub.plot('BCE', ax=ax, legend=True, cmap=f"{cmap}_r")
 ax.set_title('Binary Cross-entropy')
 
 ax = axs[0, 2]
-gdf.plot('RMSE', ax=ax, legend=True, cmap=f"{cmap}_r")
+gdf_sub.plot('RMSE', ax=ax, legend=True, cmap=f"{cmap}_r")
 ax.set_title('Root-mean-squared Error (days)')
 
 ax = axs[1, 2]
-gdf.plot('Precision', ax=ax, legend=True, cmap=cmap)
+gdf_sub.plot('Precision', ax=ax, legend=True, cmap=cmap)
 ax.set_title('Precision')
 
 ax = axs[1, 0]
-gdf.plot('Recall', ax=ax, legend=True, cmap=cmap)
+gdf_sub.plot('Recall', ax=ax, legend=True, cmap=cmap)
 ax.set_title('Recall')
 
 # ax = axs[1, 1]
@@ -99,7 +125,7 @@ ax.set_title('Recall')
 # ax.set_title('F1 score')
 
 ax = axs[1, 1]
-gdf.plot('AUROC', ax=ax, legend=True, cmap=cmap)
+gdf_sub.plot('AUROC', ax=ax, legend=True, cmap=cmap)
 ax.set_title('AUR-ROC')
 
 fig.suptitle("Predictive power of ZABI GLM across the UK")
@@ -123,9 +149,9 @@ titles = ['Intercept', 'Current month', 'Previous 2 months', 'Previous 3 months'
 fig, axs = plt.subplots(2, 5, figsize=(16, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
 
-coeffients = ['ber.intercept', 'ber', 'ber.ma.t2', 'ber.ma.t3',
-              'ber.ma.t6', 'ber.ma.t9', 'ber.ma.t12', 'ber.ma.t24',
-              'ber.ma.t36', 'ber.ma.t48']
+coeffients = ['ber.intercept', 'ber', 'ber2', 'ber3',
+              'ber6', 'ber9', 'ber12', 'ber24',
+              'ber36', 'ber48']
 
 for i, coef in enumerate(coeffients):
     ax = axs.flatten()[i]
@@ -139,14 +165,15 @@ for i, coef in enumerate(coeffients):
     ax.set_ylabel("Latitude")
     ax.label_outer()
 
-fig.suptitle("Bernoulli coefficients of ZABI GLM across the UK")
+fig.suptitle("Bernoulli coefficients of ZABI GLM across the UK");
 
 # %% Plotting Binomial
 fig, axs = plt.subplots(2, 5, figsize=(16, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
 
-coefficients = ['bin.intercept', 'bin', 'bin.ma.t2', 'bin.ma.t3', 'bin.ma.t6',
-                'bin.ma.t9', 'bin.ma.t12', 'bin.ma.t24', 'bin.ma.t36', 'bin.ma.t48']
+coefficients = ['bin.intercept', 'bin', 'bin2', 'bin3',
+                'bin6', 'bin9', 'bin12', 'bin24',
+                'bin36', 'bin48']
 
 for i, coef in enumerate(coefficients):
     ax = axs.flatten()[i]
