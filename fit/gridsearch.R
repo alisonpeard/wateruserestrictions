@@ -2,6 +2,7 @@
 ---- Notes ----
 Gridsearch different moving average types and window lengths.
 "
+
 rm(list=ls())
 library(dplyr)
 library(glarma)
@@ -14,7 +15,7 @@ library(pracma)
 library(stringr) # for title case
 library(patchwork)
 library(stargazer)
-source("myutils.R")
+source("fitutils.R")
 
 WRZ = "ruthamford_north"
 RZ_IDs = list(london=117, united_utilities_grid=122, ruthamford_north=22)
