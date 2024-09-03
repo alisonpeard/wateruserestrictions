@@ -12,7 +12,7 @@ wrz_folders = os.listdir(os.path.join(datadir, "cv"))
 wrz_folders = [f for f in wrz_folders if not f.startswith(".")]
 
 # %% ----Average the metrics for each WRZ----
-training = 'FF2'
+training = 'NF2'
 trend = 'raw'
 lag = 'ma.s'
 toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.si12', '.si24']
@@ -40,7 +40,6 @@ for folder in wrz_folders:
     df_avg = df.groupby('indicator').mean()
     df_avg = df_avg.loc[['si6', 'si12', 'si24']]
     df_avg.to_csv(os.path.join(filedir, "mafits__avg.csv"))
-
 
 # %% ----Read in the averaged metrics----
 fits = []

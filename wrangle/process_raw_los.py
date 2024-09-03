@@ -59,12 +59,12 @@ for ensemble in range(1, 101):
     df = df.drop(columns=["Day", "Year"])
     df = df.set_index("Date")
 
-    # group all columns in same WRZ
+    # group all columns in same WR'
     df.columns = df.columns.map(wrz_dict)
     valid_columns = df.columns[(df.columns != 'nan') & (~df.columns.isnull())]
     df = df[valid_columns]
     df.columns.name = "RZ_ID"
-    df = df.groupby('RZ_ID', axis=1).max() # aggregate all WRz
+    df = df.groupby('RZ_ID', axis=1).max() # aggregate all WRz (should be all zero)
     df.columns = df.columns.astype(int)
     df = df.sort_values(by='RZ_ID', axis=1)
 
