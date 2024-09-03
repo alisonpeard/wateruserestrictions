@@ -34,7 +34,7 @@ data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
 res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
-SCENARIO <- 'ff'
+SCENARIO <- 'nf'
 ENSEMBLE <- paste0(toupper(SCENARIO), '2')
 
 # subset rz_keys by what time series are available
@@ -42,7 +42,7 @@ ts.path <- paste0(data.dir, '/', SCENARIO, '/ts_with_levels.csv')
 rz_keys = read.csv(paste0(wdir, '/data', '/wrz_key.csv'))
 df <- read.csv(paste0(ts.path))
 rz_keys <- merge(rz_keys, df, by.y='RZ_ID', by.x='rz_id')
-rz_keys <- unique(rz_keys[c('rz_id', 'wrz')])
+rz_keys <- unique(rz_keys[c('rz_id', 'wrz')]) # 29 unique
 
 # (a) loop through all regressor options for London
 RZ_ID <- 117
@@ -157,17 +157,19 @@ if(TRUE){
 }
 
 # (b) loop through water resource zones for chosen combination
-INDICATOR.BASE <- 'si24'      # c('si6', 'si12', 'si24', 'ep_total')
+INDICATOR.BASE <- 'si6'      # c('si6', 'si12', 'si24', 'ep_total')
 TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
 LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
+K <- 30                       # 30
 if(FALSE){
-  for(i in 1:nrow(rz_keys)){
+  rz_keys$success <- FALSE
+  for(x in 1:nrow(rz_keys)){
     try({
       # i = 1 # (for dev)
       INDICATOR <- INDICATOR.BASE
-      RZ_ID <- rz_keys$rz_id[i]
-      WRZ <- rz_keys$wrz[i]
+      RZ_ID <- rz_keys$rz_id[x]
+      WRZ <- rz_keys$wrz[x]
       WRZLABEL <- str_to_title(gsub("_", " ", WRZ))
       print(paste0('Fitting on ',WRZ))
       
@@ -181,8 +183,8 @@ if(FALSE){
       
       # add moving average and decomposition terms
       INDICATORS <- c(INDICATOR)
-      windows <- c(2, 3, 6, 9, 12, 24, 36, 48) # length of MA windows (in months) 
-      types <- c("s", "t", "m", "e", "r")
+      windows <- c(2, 3, 6, 9, 12, 24) # length of MA windows (in months) 
+      types <- c("s", "t")
       if(TREND.MODE == 'trend'){
         for(j in length(INDICATORS)){ # decompose
           df <- ensemblewise(decompose.column, df, INDICATOR)
@@ -226,7 +228,6 @@ if(FALSE){
       
       # training subset by 30-member ensemble
       set.seed(2)
-      K <- 30
       rows <- vector("list", K) 
       for(run in 1:K){
         # run = 1 # for dev
@@ -247,12 +248,14 @@ if(FALSE){
       outdir <- paste0(res.dir, '/cv/', WRZ, '/', TREND.MODE, '/', INDICATOR.BASE, '/', LAG.MODE, '.', TYPE)
       dir.create(outdir, recursive=TRUE)
       write.csv(summary, paste0(outdir, '/', ENSEMBLE, '.csv'))
+      rz_keys[x, 'success'] <- TRUE
       print(paste0("Saved!"))
     })
   }#
+  print('Finished gridsearch.')
+  rz_keys
 }
 
-print('Finished gridsearch.')
 
 
 
