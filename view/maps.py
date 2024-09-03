@@ -64,9 +64,10 @@ key_df.to_csv(os.path.join(datadir, "..", "wrz_key.csv"), index=False)
 dfs = []
 for f in fits:
     df = pd.read_csv(f, index_col=0, skipinitialspace=True)
-    # df['wrz'] = f.split("/")[-2]
+    df['wrz'] = f.split("/")[-2]
     dfs.append(df)
-df = pd.concat(dfs).reset_index(drop=False).dropna()
+
+df = pd.concat(dfs).reset_index(drop=False)#.dropna()
 
 # %%
 gdf = gpd.read_file(os.path.join(wd, "data", "input", 'WRZ', "WRZ.shp"))
@@ -140,21 +141,21 @@ for ax in axs.flatten():
 # %% Plotting Bernoulli coefficients
 import matplotlib.colors as colors
 
+# set max columns to infinity
 cmap = 'coolwarm'
 titles = ['Intercept', 'Current month', 'Previous 2 months', 'Previous 3 months',
           'Previous 6 months', 'Previous 9 months', 'Previous 12 months',
           'Previous 24 months', 'Previous 36 months', 'Previous 48 months']
 
-fig, axs = plt.subplots(2, 5, figsize=(16, 8), sharex=True, sharey=True,
+fig, axs = plt.subplots(2, 4, figsize=(16, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
 
 coeffients = ['ber.intercept', 'ber', 'ber2', 'ber3',
-              'ber6', 'ber9', 'ber12', 'ber24',
-              'ber36', 'ber48']
+              'ber6', 'ber9', 'ber12', 'ber24']
 
 for i, coef in enumerate(coeffients):
     ax = axs.flatten()[i]
-    gdf.plot(coef, ax=ax, legend=True, cmap=cmap, norm=colors.CenteredNorm())
+    gdf_sub.plot(coef, ax=ax, legend=True, cmap=cmap, norm=colors.CenteredNorm())
     ax.set_title(coef)
     ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
     ax.add_feature(cartopy.feature.LAND, color='tan')
@@ -167,16 +168,15 @@ for i, coef in enumerate(coeffients):
 fig.suptitle("Bernoulli coefficients of ZABI GLM across the UK");
 
 # %% Plotting Binomial
-fig, axs = plt.subplots(2, 5, figsize=(16, 8), sharex=True, sharey=True,
+fig, axs = plt.subplots(2, 4, figsize=(16, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
 
 coefficients = ['bin.intercept', 'bin', 'bin2', 'bin3',
-                'bin6', 'bin9', 'bin12', 'bin24',
-                'bin36', 'bin48']
+                'bin6', 'bin9', 'bin12', 'bin24']
 
 for i, coef in enumerate(coefficients):
     ax = axs.flatten()[i]
-    gdf.plot(coef, ax=ax, legend=True, cmap=cmap, norm=colors.CenteredNorm())
+    gdf_sub.plot(coef, ax=ax, legend=True, cmap=cmap, norm=colors.CenteredNorm())
     ax.set_title(coef)
     ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
     ax.add_feature(cartopy.feature.LAND, color='tan')
@@ -188,4 +188,11 @@ for i, coef in enumerate(coefficients):
 
 fig.suptitle("Binomial coefficients of ZABI GLM across the UK")
 
+# %% check who is missing
+codes = pd.read_excel(os.path.join(wd, "data", "input", "WRZ", "WRZ_code.xlsx"))
+code_list = codes['RZ ID'].dropna().unique().tolist()
+code_list = [int(x) for x in code_list]
+result_codes = gdf['RZ_ID'].unique().tolist()
+missing_codes = [x for x in code_list if x not in result_codes]
+codes[codes['RZ ID'].isin(missing_codes)]
 # %%
