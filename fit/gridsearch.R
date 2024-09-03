@@ -1,17 +1,16 @@
 "
-Run (a) or (b).
+Run (a) or (b):
 (a) Cycles through all regressor combinations for London and output summary metrics 
-  in ../cv/london/<trend>/<regressor>/<lag mode>/<lag type>/FF2.csv
+  in ../cv/london/<trend>/<regressor>/<lag mode>/<lag type>/NF2.csv
 (b) Cycles throught the chosen regressor combination for all WRZs and outputs the 
   same. 
 
 Inference code repeats the training procedure 30 times for different
 random seeds to produce an ensemble of prediction metrics. The model trains
-on ensemble members FF1 and FF2 then predicts on the remaining 98 ensemble members and
-records the metrics.
+on ensemble members NF1 and NF2 then predicts on the remaining 98 NF ensemble members
+and records the metrics.
 
 LASSO regulatisation using cv.glmnet.
-GMLNet documentation: https://glmnet.stanford.edu/articles/glmnet.html
 "
 rm(list=ls())
 library(dplyr)
@@ -34,7 +33,7 @@ data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
 res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
-SCENARIO <- 'nf'
+SCENARIO <- 'ff'
 ENSEMBLE <- paste0(toupper(SCENARIO), '2')
 
 # subset rz_keys by what time series are available
@@ -51,7 +50,7 @@ INDs <- c('ep_total', 'si6', 'si12', 'si24')
 TREND.MODES <- c('raw', 'trend')
 LAG.MODES <- c('lag', 'ma')
 TYPES <- c("s", "t")
-if(TRUE){
+if(FALSE){
   for(x in 1:length(INDs)){
     for(y in 1:length(TREND.MODES)){
       for(z in 1:length(LAG.MODES)){
@@ -157,12 +156,14 @@ if(TRUE){
 }
 
 # (b) loop through water resource zones for chosen combination
-INDICATOR.BASE <- 'si6'      # c('si6', 'si12', 'si24', 'ep_total')
+INDICATOR.BASE <- 'si24'      # c('si6', 'si12', 'si24', 'ep_total')
 TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
 LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
-K <- 30                       # 30
-if(FALSE){
+K <- 30
+rz_keys <- rz_keys[rz_keys$rz_id == 62,] # to only train on a subset
+# currently missing 23, 62, 99, 68, 126, 97, 93, 91, 94, 109, 101, 127
+if(TRUE){
   rz_keys$success <- FALSE
   for(x in 1:nrow(rz_keys)){
     try({
@@ -180,6 +181,10 @@ if(FALSE){
       df$LoS.binary <- as.numeric(df$LoS > 0)
       df$n <- lubridate::days_in_month(df$Date)
       df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATOR, 'ensemble', 'n', 'Date')])
+      
+      # check the distribution of LoS days
+      totals = df[,c('ensemble', 'LoS')] %>% group_by(ensemble) %>% summarise(LoS = sum(LoS>0), count=n())
+      print(totals,n=100)
       
       # add moving average and decomposition terms
       INDICATORS <- c(INDICATOR)
