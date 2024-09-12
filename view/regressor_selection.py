@@ -7,6 +7,7 @@ wd = os.path.join(os.path.expanduser("~"), "Documents", "RAPID", "correlation-an
 datadir = os.path.join(wd, "data", "results")
 ensembledir = os.path.join(datadir, "cv", "london")
 figdir = '/Users/alison/Documents/RAPID/correlation-analysis/figures'
+scenario = 'nf'
 
 # %%
 pd.set_option('display.precision', 4)
@@ -20,7 +21,7 @@ lag_rename = {'lag.': 'Pointwise', 'ma.s': 'Simple MA', 'ma.t': 'Triangular MA'}
 
 for root, dirs, files in os.walk(ensembledir):
     for file in files:
-        if file.endswith("NF2.csv"):
+        if file.endswith(f"{scenario.upper()}2.csv"):
             df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
             df = df.replace('NA', pd.NA)
             columns = df.columns
@@ -46,9 +47,11 @@ df_styled = df.style.background_gradient(
         ).format(
             precision=4
             )
-dfi.export(df_styled, os.path.join(figdir, 'modelselection.png'),
+
+dfi.export(df_styled, os.path.join(figdir, f'modelselection_{scenario}.png'),
            table_conversion='matplotlib',
            dpi=300)
-df_styled.to_excel(os.path.join(figdir, 'modelselection.xlsx'), float_format="%.4f")
+
+df_styled.to_excel(os.path.join(figdir, f'modelselection_{scenario}.xlsx'), float_format="%.4f")
 df_styled
 # %%

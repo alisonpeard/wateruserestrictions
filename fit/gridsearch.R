@@ -33,7 +33,7 @@ data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
 res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
-SCENARIO <- 'ff'
+SCENARIO <- 'bs'
 ENSEMBLE <- paste0(toupper(SCENARIO), '2')
 
 # subset rz_keys by what time series are available
@@ -42,6 +42,10 @@ rz_keys = read.csv(paste0(wdir, '/data', '/wrz_key.csv'))
 df <- read.csv(paste0(ts.path))
 rz_keys <- merge(rz_keys, df, by.y='RZ_ID', by.x='rz_id')
 rz_keys <- unique(rz_keys[c('rz_id', 'wrz')]) # 29 unique
+missing <- read.csv(paste0(data.dir, '/missingdata.csv'))
+missing <- missing[missing$scenario==SCENARIO,]
+valid <- as.numeric(missing[missing$model==1,]$RZ_ID);valid
+rz_keys <- rz_keys[rz_keys$rz_id %in% valid,]
 
 # (a) loop through all regressor options for London
 RZ_ID <- 117
@@ -161,8 +165,7 @@ TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
 LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
 K <- 30
-rz_keys <- rz_keys[rz_keys$rz_id == 62,] # to only train on a subset
-# currently missing 23, 62, 99, 68, 126, 97, 93, 91, 94, 109, 101, 127
+# rz_keys <- rz_keys[rz_keys$rz_id %in% c(62, 99, 104),] # to only train on a subset
 if(TRUE){
   rz_keys$success <- FALSE
   for(x in 1:nrow(rz_keys)){
@@ -184,7 +187,7 @@ if(TRUE){
       
       # check the distribution of LoS days
       totals = df[,c('ensemble', 'LoS')] %>% group_by(ensemble) %>% summarise(LoS = sum(LoS>0), count=n())
-      print(totals,n=100)
+      print(totals, n=100)
       
       # add moving average and decomposition terms
       INDICATORS <- c(INDICATOR)
