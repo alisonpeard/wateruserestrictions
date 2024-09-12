@@ -1,10 +1,12 @@
 # %%
 import os
+os.environ['USE_PYGEOS'] = '0'
 from glob import glob
 import pandas as pd
 import geopandas as gpd
-os.environ['USE_PYGEOS'] = '0'
 import matplotlib.pyplot as plt
+import cartopy
+import cartopy.crs as ccrs
 
 wd = os.path.join(os.path.expanduser("~"), "Documents", "RAPID", "correlation-analysis")
 datadir = os.path.join(wd, "data", "results")
@@ -12,7 +14,7 @@ wrz_folders = os.listdir(os.path.join(datadir, "cv"))
 wrz_folders = [f for f in wrz_folders if not f.startswith(".")]
 
 # %% ----Average the metrics for each WRZ----
-training = 'NF2'
+training = 'FF2'
 trend = 'raw'
 lag = 'ma.s'
 toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.si12', '.si24']
@@ -75,28 +77,67 @@ boundaries = gdf.set_geometry(gdf['geometry'].boundary).to_crs(4326)
 gdf = gdf.merge(df, left_on='RZ_ID', right_on='rz_id')
 gdf = gdf.to_crs(4326) # nicer plotting
 
-# %% Plotting metrics
-import cartopy
-import cartopy.crs as ccrs
+# %% load key for missing data
+all_wrz = gpd.read_file(os.path.join(wd, "data", "input", 'WRZ', "WRZ.shp")).to_crs(4326)
+missing = pd.read_csv(os.path.join(datadir, "full_timeseries", "240403", "missingdata.csv"))
+missing = missing[missing['scenario'] == training[:-1].lower()]
+missing = missing[missing['model'] == 1].set_index('RZ_ID')
+missing['geometry'] = all_wrz.set_index('RZ_ID')['geometry']
+missing = gpd.GeoDataFrame(missing, geometry='geometry').set_crs(4326)
+present = missing.index.tolist()
 
+#%% check all available data is plotted
+fig, axs = plt.subplots(1, 2, figsize=(10, 4), subplot_kw={'projection': ccrs.PlateCarree()})
+
+ax = axs[0]
+gdf.plot(color='red', ax=ax)
+boundaries.plot(color='k', ax=ax, linewidth=0.1)
+ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
+ax.add_feature(cartopy.feature.LAND, color='tan')
+ax.set_xlabel("Longitude")
+ax.set_ylabel("Latitude")
+ax.set_title('Modelled data')
+
+ax = axs[1]
+missing.plot(color='red', ax=ax)
+boundaries.plot(color='k', ax=ax, linewidth=0.1)
+ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
+ax.add_feature(cartopy.feature.LAND, color='tan')
+ax.set_xlabel("Longitude")
+ax.set_ylabel("Latitude")
+ax.set_title('Data that should be modelled')
+
+not_modelled = [x for x in present if x not in gdf['RZ_ID'].unique().tolist()]
+falsely_modelled = [x for x in gdf['RZ_ID'].unique().tolist() if x not in present]
+
+print(f"Number of WRZ not modelled: {len(not_modelled)}: {not_modelled}")
+print(f"Number of WRZ falsely modelled: {len(falsely_modelled)}: {falsely_modelled}")
+# %%compare to what is present
+modelled = gdf['RZ_ID'].unique().tolist()
+missing = [x for x in present if x not in modelled]
+gdf = gdf[gdf['RZ_ID'].isin(present)] # make sure only count valid wrz
+
+# %% Plotting metrics
 cmap = 'YlOrRd'
 
-# subset by indicator
-indicator = 'si6'
-gdf_sub = gdf[gdf['indicator'] == indicator]
-# # subset by best
-# aggfunc = {
-#     'Brier': 'min',
-#     'BCE': 'min',
-#     'RMSE': 'min',
-#     'Precision': 'max',
-#     'Recall': 'max',
-#     'F1': 'max',
-#     'AUROC': 'max',
-#     'geometry': 'first'
-# }
-# gdf_sub = gdf.groupby(['RZ_ID']).agg(aggfunc).reset_index()
-# gdf_sub = gpd.GeoDataFrame(gdf_sub, geometry='geometry').set_crs(4326)
+if True:
+    # subset by indicator
+    indicator = 'si6'
+    gdf_sub = gdf[gdf['indicator'] == indicator]
+else:
+    # subset by best
+    aggfunc = {
+        'Brier': 'min',
+        'BCE': 'min',
+        'RMSE': 'min',
+        'Precision': 'max',
+        'Recall': 'max',
+        'F1': 'max',
+        'AUROC': 'max',
+        'geometry': 'first'
+    }
+    gdf_sub = gdf.groupby(['RZ_ID']).agg(aggfunc).reset_index()
+    gdf_sub = gpd.GeoDataFrame(gdf_sub, geometry='geometry').set_crs(4326)
 
 fig, axs = plt.subplots(2, 3, figsize=(12, 8), sharex=True, sharey=True,
                         subplot_kw={'projection': ccrs.PlateCarree()})
@@ -138,7 +179,7 @@ for ax in axs.flatten():
     ax.set_ylabel("Latitude")
     ax.label_outer()
 
-# %% Plotting Bernoulli coefficients
+# %% ----Plotting Bernoulli coefficients----
 import matplotlib.colors as colors
 
 # set max columns to infinity
@@ -195,4 +236,7 @@ code_list = [int(x) for x in code_list]
 result_codes = gdf['RZ_ID'].unique().tolist()
 missing_codes = [x for x in code_list if x not in result_codes]
 codes[codes['RZ ID'].isin(missing_codes)]
+print(f"Missing codes: {missing_codes}")
+print(f"Number of missing codes: {len(missing_codes)}")
 # %%
+
