@@ -67,7 +67,15 @@ confusion <- function(y, f){
   return(round(cm, 4))
 }
 accuracy <- function(y, f){cm <- confusion(y,f);round((cm[1,1] + cm[2,2]) / sum(cm), 4)}
-precision <- function(y,f){cm <- confusion(y,f);round(cm[1,1] / (cm[1,1] + cm[2,1]), 4)}
+precision <- function(y,f){
+  cm <- confusion(y,f)
+  if((cm[1,1] + cm[2,1]) > 0){
+    p <- round(cm[1,1] / (cm[1,1] + cm[2,1]), 4)
+  }else{
+    p <- 0
+  }
+  return(p)
+  }
 recall <- function(y,f){cm <- confusion(y,f);round(cm[1,1] / (cm[1,1] + cm[1,2]), 4)}
 f1 <- function(y,f){p <- precision(y,f);r <- recall(y,f);round(2 * p * r / (p + r), 4)}
 f2 <- function(y,f){cm <- confusion(y,f);round(cm[1,1] / (cm[1,2] + cm[1,1] + cm[2,1]), 4)}
@@ -143,7 +151,7 @@ bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMB
   test$ber.p <- mu
   metrics <- binary.metrics(test$y.ber[,2], q50, mu, label)
   results <- merge(coefs, metrics)
-
+  
   return(list(fitted=train, predicted=test, summary=results))
 }
 binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBDA){

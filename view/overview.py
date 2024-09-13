@@ -3,9 +3,14 @@ eps = 0.01 # threshold for excluding zones
 
 # %%
 import os
+os.environ['USE_PYGEOS'] = '0'
 import pandas as pd
+import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import cartopy.crs as ccrs
+import cartopy.feature as feature
+import matplotlib.ticker as mticker
 import dataframe_image as dfi
 
 wd = os.path.join(os.path.expanduser("~"), "Documents", "RAPID", "correlation-analysis")
@@ -66,23 +71,18 @@ ts_styled.to_excel(os.path.join(figdir, 'missingdata.xlsx'), float_format="%.4f"
 ts_styled
 
 # %% Plot these on a map
-os.environ['USE_PYGEOS'] = '0'
-import geopandas as gpd
-import cartopy.crs as ccrs
-import cartopy.feature as feature
-
 wrz = gpd.read_file(os.path.join(wd, 'data', 'input', 'WRZ', 'WRZ.shp'))
 wrz = wrz.to_crs(4326)
 
 ts_summary = ts_summary.reset_index().set_index('RZ_ID')
 ts_summary['geometry'] = wrz.set_index('RZ_ID')['geometry']
 ts_summary = gpd.GeoDataFrame(ts_summary, geometry='geometry').set_crs(4326)
+
 # %%
 legend = {0: f'<{eps:.1%} average WUR', 1: 'Balanced classes', 2: f'>{1-eps:.1%} average WUR'}
 ts_summary['alias'] = ts_summary['model'].apply(lambda x: legend[x])
 
 # %% define colorbar and legend
-import matplotlib.ticker as mticker
 
 categories = [*legend.values()]
 cmap3 = cmap2.copy()
@@ -108,7 +108,6 @@ for ax, scen in zip(axs, scenarios):
     
     number_excluded = (ts_sub['model'] != 1).sum()
     ax.set_title(f"{scen.upper()} ({number_excluded} excluded)")
-
 fig.suptitle("Missing data in the UK")
 
 # %% Also plot the mean %WUR for each scenario
@@ -117,7 +116,6 @@ for ax, scen in zip(axs, scenarios):
     plot_background(wrz, ax, scen.upper())
     ts_sub = ts_summary[ts_summary['scenario'] == scen]
     im = ts_sub.plot(('ratio', 'mean'), ax=ax, cmap='YlOrRd', legend=True)
-
 fig.suptitle("Average %WUR across the UK")
 
 # %% Plot the standard deviation of the %WUR for each scenario
@@ -126,7 +124,6 @@ for ax, scen in zip(axs, scenarios):
     plot_background(wrz, ax, scen.upper())
     ts_sub = ts_summary[ts_summary['scenario'] == scen]
     im = ts_sub.plot(('ratio', 'std'), ax=ax, cmap='YlOrRd', legend=True)
-
 fig.suptitle("Standard deviation of %WUR across the UK")
 
 # %% Save results
