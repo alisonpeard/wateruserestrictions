@@ -33,7 +33,7 @@ data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
 res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
-SCENARIO <- 'bs'
+SCENARIO <- 'ff'
 ENSEMBLE <- paste0(toupper(SCENARIO), '2')
 
 # subset rz_keys by what time series are available
@@ -165,7 +165,7 @@ TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
 LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
 K <- 30
-# rz_keys <- rz_keys[rz_keys$rz_id %in% c(62, 99, 104),] # to only train on a subset
+rz_keys <- rz_keys[rz_keys$rz_id %in% c(36, 68, 97, 104, 127),] # to only train on a subset
 if(TRUE){
   rz_keys$success <- FALSE
   for(x in 1:nrow(rz_keys)){
@@ -187,6 +187,7 @@ if(TRUE){
       
       # check the distribution of LoS days
       totals = df[,c('ensemble', 'LoS')] %>% group_by(ensemble) %>% summarise(LoS = sum(LoS>0), count=n())
+      
       print(totals, n=100)
       
       # add moving average and decomposition terms

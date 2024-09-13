@@ -5,6 +5,7 @@ from glob import glob
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import cartopy
 import cartopy.crs as ccrs
 
@@ -68,7 +69,6 @@ for f in fits:
     df = pd.read_csv(f, index_col=0, skipinitialspace=True)
     df['wrz'] = f.split("/")[-2]
     dfs.append(df)
-
 df = pd.concat(dfs).reset_index(drop=False)#.dropna()
 
 # %%
@@ -87,42 +87,59 @@ missing = gpd.GeoDataFrame(missing, geometry='geometry').set_crs(4326)
 present = missing.index.tolist()
 
 #%% check all available data is plotted
-fig, axs = plt.subplots(1, 2, figsize=(10, 4), subplot_kw={'projection': ccrs.PlateCarree()})
+if False:
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), subplot_kw={'projection': ccrs.PlateCarree()})
 
-ax = axs[0]
-gdf.plot(color='red', ax=ax)
-boundaries.plot(color='k', ax=ax, linewidth=0.1)
-ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
-ax.add_feature(cartopy.feature.LAND, color='tan')
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-ax.set_title('Modelled data')
+    ax = axs[0]
+    gdf.plot(color='red', ax=ax)
+    boundaries.plot(color='k', ax=ax, linewidth=0.1)
+    ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
+    ax.add_feature(cartopy.feature.LAND, color='tan')
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title('Modelled data')
 
-ax = axs[1]
-missing.plot(color='red', ax=ax)
-boundaries.plot(color='k', ax=ax, linewidth=0.1)
-ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
-ax.add_feature(cartopy.feature.LAND, color='tan')
-ax.set_xlabel("Longitude")
-ax.set_ylabel("Latitude")
-ax.set_title('Data that should be modelled')
+    ax = axs[1]
+    missing.plot(color='red', ax=ax)
+    boundaries.plot(color='k', ax=ax, linewidth=0.1)
+    ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
+    ax.add_feature(cartopy.feature.LAND, color='tan')
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title('Data that should be modelled')
 
-not_modelled = [x for x in present if x not in gdf['RZ_ID'].unique().tolist()]
-falsely_modelled = [x for x in gdf['RZ_ID'].unique().tolist() if x not in present]
+    not_modelled = [x for x in present if x not in gdf['RZ_ID'].unique().tolist()]
+    falsely_modelled = [x for x in gdf['RZ_ID'].unique().tolist() if x not in present]
 
-print(f"Number of WRZ not modelled: {len(not_modelled)}: {not_modelled}")
-print(f"Number of WRZ falsely modelled: {len(falsely_modelled)}: {falsely_modelled}")
-# %%compare to what is present
-modelled = gdf['RZ_ID'].unique().tolist()
-missing = [x for x in present if x not in modelled]
-gdf = gdf[gdf['RZ_ID'].isin(present)] # make sure only count valid wrz
+    print(f"Number of WRZ not modelled: {len(not_modelled)}: {not_modelled}")
+    print(f"Number of WRZ falsely modelled: {len(falsely_modelled)}: {falsely_modelled}")
+    # compare to what is present
+    modelled = gdf['RZ_ID'].unique().tolist()
+    missing = [x for x in present if x not in modelled]
+    gdf = gdf[gdf['RZ_ID'].isin(present)] # make sure only count valid wrz
+
+# %% Option to model a specific WRZ
+if False:
+    rz_id = 127
+    gdf_sub = all_wrz.copy()
+    gdf_sub['RZ_ID'] = (gdf_sub['RZ_ID'] == rz_id).astype(int)
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5), subplot_kw={'projection': ccrs.PlateCarree()})
+    gdf_sub.plot('RZ_ID', categorical=True, legend=True, ax=ax, cmap='coolwarm')
+    boundaries.plot(color='k', ax=ax, linewidth=0.1)
+    ax.add_feature(cartopy.feature.OCEAN, color='lightblue')
+    ax.add_feature(cartopy.feature.LAND, color='tan')
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title('Modelled data')
+
 
 # %% Plotting metrics
 cmap = 'YlOrRd'
 
 if True:
     # subset by indicator
-    indicator = 'si6'
+    indicator = 'si24'
     gdf_sub = gdf[gdf['indicator'] == indicator]
 else:
     # subset by best
@@ -180,8 +197,6 @@ for ax in axs.flatten():
     ax.label_outer()
 
 # %% ----Plotting Bernoulli coefficients----
-import matplotlib.colors as colors
-
 # set max columns to infinity
 cmap = 'coolwarm'
 titles = ['Intercept', 'Current month', 'Previous 2 months', 'Previous 3 months',
@@ -226,7 +241,6 @@ for i, coef in enumerate(coefficients):
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     ax.label_outer()
-
 fig.suptitle("Binomial coefficients of ZABI GLM across the UK")
 
 # %% check who is missing
