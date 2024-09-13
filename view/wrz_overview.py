@@ -120,6 +120,15 @@ for ax, scen in zip(axs, scenarios):
 
 fig.suptitle("Average %WUR across the UK")
 
+# %% Plot the standard deviation of the %WUR for each scenario
+fig, axs = plt.subplots(1, 3, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(15, 5))
+for ax, scen in zip(axs, scenarios):
+    plot_background(wrz, ax, scen.upper())
+    ts_sub = ts_summary[ts_summary['scenario'] == scen]
+    im = ts_sub.plot(('ratio', 'std'), ax=ax, cmap='YlOrRd', legend=True)
+
+fig.suptitle("Standard deviation of %WUR across the UK")
+
 # %% Save results
 ts_summary.columns = ['scenario', 'min', 'max', 'std', 'mean', 'model', 'geometry', 'comment']
 ts_summary = ts_summary.drop(columns='geometry')
