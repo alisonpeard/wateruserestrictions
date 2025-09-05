@@ -42,7 +42,7 @@ df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATOR, 'ensemble', 'n', '
 # add moving average and decomposition terms
 INDICATORS <- c(INDICATOR)
 windows <- c(2, 3, 6, 9, 12, 24) # length of MA windows (in months) 
-types <- c("s", "t") # , "m", "e", "r")
+types <- c("s", "t") # , "m", "e", "r") # type of MA: s=simple, t=triangular, m=modified, e=exponential, r=recursive
 if(TREND){
   for(INDICATOR in INDICATORS){ # decompose
     df <- ensemblewise(decompose.column, df, INDICATOR)
