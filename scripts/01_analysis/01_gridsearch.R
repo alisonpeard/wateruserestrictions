@@ -48,12 +48,15 @@ valid <- as.numeric(missing[missing$model==1,]$RZ_ID);valid
 rz_keys <- rz_keys[rz_keys$rz_id %in% valid,]
 
 # (a) loop through all regressor options for London
-RZ_ID <- 117
 WRZ <- 'london'
+RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
+RZ_ID <- RZ_IDS[[WRZ]]
+
 INDs <- c('ep_total', 'si6', 'si12', 'si24')
 TREND.MODES <- c('raw', 'trend')
 LAG.MODES <- c('lag', 'ma')
 TYPES <- c("s", "t")
+
 if(FALSE){
   for(x in 1:length(INDs)){
     for(y in 1:length(TREND.MODES)){

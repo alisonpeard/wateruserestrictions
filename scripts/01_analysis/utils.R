@@ -16,47 +16,53 @@ ensemblewise <- function(fun, df, column, ...) {
   dfs <- do.call(rbind, dfs)
   return(dfs)
 }
-decompose.column <- function(df, column='si6'){ # BUG!
+
+decompose.column <- function(df, column='si6') { # BUG!
   ts <- ts(df[[column]], frequency = 12)
   ts.decomp <- stl(ts, s.window='periodic')$time.series[,2]
   colname <- paste0(column, '.trend')
   df[[colname]] <- as.numeric(ts.decomp)
   return(df)
 }
-lag.column <- function(df, column, k=1){
+
+lag.column <- function(df, column, k=1) {
   df[[paste0(column, '.lag.', k)]] = dplyr::lag(df[[column]], k)
   return(df)
 }
-movavg.column <- function(df, col, n, type){
+
+movavg.column <- function(df, col, n, type) {
   col.ma <- movavg(df[[col]], n, type)
   df[[paste0(col, '.ma.',type,n)]] <- col.ma
   return(df)
 }
-make.conf.int <- function(df){
+
+make.conf.int <- function(df) {
   Qlower <- subset(df, select=c('Date', 'lower'))
   Qupper <- subset(df, select=c('Date', 'upper'))
-  names(Qlower) <- c('x', 'y'); Qlower <- Qlower[order(Qlower$x),]
-  names(Qupper) <- c('x', 'y'); Qupper <- Qupper[order(Qupper$x, decreasing=TRUE),]
+  names(Qlower) <- c('x', 'y'); Qlower <- Qlower[order(Qlower$x), ]
+  names(Qupper) <- c('x', 'y'); Qupper <- Qupper[order(Qupper$x, decreasing=TRUE), ]
   rle.lower <- rle(!is.na(Qlower$y))
   rle.upper <- rle(!is.na(Qupper$y))
   Qlower$group <- as.factor(rep(seq_along(rle.lower$values), rle.lower$lengths))
   Qupper$group <- as.factor(rep(rev(seq_along(rev(rle.upper$values))), rle.upper$lengths)) # this line is tricky
   conf.int <- na.omit(rbind(Qlower, Qupper))
-  conf.int <- conf.int[order(conf.int$group),]
-  return(conf.int)
+  conf.int <- conf.int[order(conf.int$group), ]
+  conf.int
 }
 
 # ----Metrics----
-bce <- function(y, p){
+bce <- function(y, p) {
   y <- c(1 - y, y)
   p <- c(1 - p, p)
-  return(round(-mean(y * log(p)), 4))
+  round(-mean(y * log(p)), 4)
 }
-brier <- function(y, p){
+
+brier <- function(y, p) {
   bs <- mean((p - y)**2)
-  return(round(bs, 4))
+  round(bs, 4)
 }
-confusion <- function(y, f){
+
+confusion <- function(y, f) {
   # y: truth, f: preds
   tp <- sum(y * f)
   fp <- sum((1 - y) * f)
@@ -64,22 +70,41 @@ confusion <- function(y, f){
   tn <- sum((1 - y) * (1 - f))
   cm <- matrix(c(tp, fp, fn, tn), nrow=2, ncol=2)
   dimnames(cm) <- list(c("T", "F"), c("T", "F"))
-  return(round(cm, 4))
+  round(cm, 4)
 }
-accuracy <- function(y, f){cm <- confusion(y,f);round((cm[1,1] + cm[2,2]) / sum(cm), 4)}
-precision <- function(y,f){
+
+accuracy <- function(y, f) {
   cm <- confusion(y,f)
-  if((cm[1,1] + cm[2,1]) > 0){
+  round((cm[1,1] + cm[2,2]) / sum(cm), 4)
+}
+
+precision <- function(y,f) {
+  cm <- confusion(y,f)
+  if ((cm[1,1] + cm[2,1]) > 0) {
     p <- round(cm[1,1] / (cm[1,1] + cm[2,1]), 4)
-  }else{
+  } else {
     p <- 0
   }
-  return(p)
-  }
-recall <- function(y,f){cm <- confusion(y,f);round(cm[1,1] / (cm[1,1] + cm[1,2]), 4)}
-f1 <- function(y,f){p <- precision(y,f);r <- recall(y,f);round(2 * p * r / (p + r), 4)}
-f2 <- function(y,f){cm <- confusion(y,f);round(cm[1,1] / (cm[1,2] + cm[1,1] + cm[2,1]), 4)}
-binary.metrics <- function(y, f, p, label='indicator'){
+  p
+}
+
+recall <- function(y,f) {
+  cm <- confusion(y,f)
+  round(cm[1,1] / (cm[1,1] + cm[1,2]), 4)
+}
+
+f1 <- function(y,f) {
+  p <- precision(y,f)
+  r <- recall(y,f)
+  round(2 * p * r / (p + r), 4)
+}
+
+f2 <- function(y,f) {
+  cm <- confusion(y,f)
+  round(cm[1,1] / (cm[1,2] + cm[1,1] + cm[2,1]), 4)
+}
+
+binary.metrics <- function(y, f, p, label='indicator') {
   score.bce <- bce(y, p)
   score.brier <- brier(y, p)
   score.auroc <- roc(y,p)$auc
@@ -90,35 +115,38 @@ binary.metrics <- function(y, f, p, label='indicator'){
   
   metric.names <- c('BCE', 'Brier', 'AUROC', 'Precision', 'Recall', 'F1', 'F2')
   metrics <- matrix(nrow=1, ncol=7, dimnames=list(NULL,metric.names))
-  metrics[1,] <- c(score.bce, score.brier, score.auroc, score.precision,
+  metrics[1, ] <- c(score.bce, score.brier, score.auroc, score.precision,
                    score.recall, score.f1, score.f2)
   metrics <- as.data.frame(metrics)
   rownames(metrics) <- label
-  return(metrics)
+  metrics
 }
-rmse <- function(y, f){
+
+rmse <- function(y, f) {
   rmse <- sqrt(mean((y - f)^2))
-  return(round(rmse, 4))
+  round(rmse, 4)
 }
-cts.metrics <- function(y, f, p, label='indicator'){
+
+cts.metrics <- function(y, f, p, label='indicator') {
   score.rmse <- rmse(y, f)
   
   metric.names <- c('RMSE')
   metrics <- matrix(nrow=1, ncol=1, dimnames=list(NULL,metric.names))
-  metrics[1,] <- c(score.rmse)
+  metrics[1, ] <- c(score.rmse)
   metrics <- as.data.frame(metrics)
   rownames(metrics) <- label
-  return(metrics)
+  metrics
 }
 
 # ----Zero-adjusted Binomial model----
-qZABI <- function(p, n, mu, nu){
+qZABI <- function(p, n, mu, nu) {
   q.bin <- qBI(p, 1, nu)
   q.ber <- qBI(p, n, mu)
   q.zabi <- c(q.bin * q.ber)
   return(q.zabi)
 }
-bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMBDA){
+
+bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMBDA) {
   bd <- 1
   p.hat <- mean(train[[y]])
   train <- train[,c("ensemble", "Date", y,X, 'n')]
@@ -154,10 +182,11 @@ bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMB
   
   return(list(fitted=train, predicted=test, summary=results))
 }
-binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBDA){
+
+binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBDA) {
   # train on positives only
-  train <- train[train[[y]][,2] > 0,]
-  test <- test[test[[y]][,2] > 0,]
+  train <- train[train[[y]][,2] > 0, ]
+  test <- test[test[[y]][,2] > 0, ]
   
   train <- train[,c("ensemble", "Date", y, X, "n")]
   test <- test[,c("ensemble", "Date", y, X, "n")]
@@ -199,9 +228,14 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   metrics <- cts.metrics(test$y.bin[,2], q50, mu, label)
   results <- merge(coefs, metrics)
   
-  return(list(fitted=train, predicted=test, summary=results))
+  return(list(
+    fitted=train,
+    predicted=test,
+    summary=results
+  ))
 }
-zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
+
+zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA) {
   ber <- bernoulli.glm(train, test, label='si6', X=regressors)
   bin <- binomial.glm(train, test, label='si6', X=regressors)
   results <- cbind(ber$summary, bin$summary)
@@ -236,6 +270,10 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA){
   test$lower <- lower
   test$upper <- upper
   
-  return(list(fitted=train, predicted=test, summary=results))
+  return(list(
+    fitted=train,
+    predicted=test,
+    summary=results
+  ))
 }
       

@@ -1,14 +1,15 @@
 {
     "paths": {
-        "datadir": "/Users/alison/Documents/RAPID/correlation-analysis/data/input",
-        "tempdir": "/Users/alison/Documents/RAPID/correlation-analysis/data/temp",
-        "resultsdir": "/Users/alison/Documents/RAPID/correlation-analysis/data/results",
-        "figdir": "/Users/alison/Documents/RAPID/correlation-analysis/figures"
+        "datadir": "../data/input",
+        "tempdir": "../data/temp",
+        "resultsdir": "../data/results",
+        "figdir": "../figures"
     },
     "config": {
-        "scenario": "hist",
-        "uk_crs": "EPSG:27700",
-        "backcasts": [3, 6, 12, 24, 36],
-        "buffers":[5000, 10000, 25000, 50000, 100000, 150000, 200000, 500000]
+        "scenario": 2,
+        "variable": 0,
+        "scenarios": ["hist", "nf", "ff"],
+        "variables": ["ep", "prbc"],
+        "uk_crs": "EPSG:27700"
     }
 }
