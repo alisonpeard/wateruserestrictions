@@ -13,3 +13,10 @@ def load_config(dirname=None):
     with open(config_path, "r") as config_fh:
         config = json.load(config_fh)
     return config
+
+
+def quantile(q):
+    def _quantile(x):
+        return np.quantile(x, q)
+    _quantile.__name__ = "q{:d}".format(int(q * 100))  # assumes only whole number percentiles are used
+    return _quantile

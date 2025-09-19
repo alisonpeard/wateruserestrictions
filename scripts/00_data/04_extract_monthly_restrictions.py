@@ -1,17 +1,18 @@
 """
 Process the LoS data, counting the number of days in each month at each level of severity.
 
+Params:
+    - config["config"]["scenario"]
+Inputs:
+    - os.path.join(config['paths']['datadir'], 'los', {scenario}.upper(),'National_Model__jobid_{ensemble}_nodal_globalPlotVars_selected.csv')
+    - os.path.join(config['paths']['datadir'], 'WRZ', 'wrz_code.xlsx')
 
-Input files:
-    1. <datadir>/los/<VERSION>/<SCENARIO>/National_Model__jobid_<ensemble>_nodal_globalPlotVars_selected.csv
-    2. <datadir>/WRZ/wrz_code.xlsx
-
-Output files:
-    1. <outdir>/los/<SCENARIO>/monthly_los_level0_melted.csv
-    2. <outdir>/los/<SCENARIO>/monthly_los_level1_melted.csv
-    3. <outdir>/los/<SCENARIO>/monthly_los_level2_melted.csv
-    4. <outdir>/los/<SCENARIO>/monthly_los_level3_melted.csv
-    5. <outdir>/los/<SCENARIO>/monthly_los_level4_melted.csv
+Outputs:
+    - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level0_melted.csv")
+    - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level1_melted.csv")
+    - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level2_melted.csv")
+    - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level3_melted.csv")
+    - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level4_melted.csv")
 """
 #%%
 import os
@@ -55,16 +56,9 @@ def melt_los_df(df):
         return df_melted
 
 
-if __name__ == "__main__":
-    wd = os.path.join(os.path.dirname(__file__), "../..")
-    os.chdir(wd)
-
-    # setup paths using config.json
-    config = utils.load_config()
-    tempdir = config['paths']['tempdir']
+def main(config):
     datadir = config['paths']['datadir']
     outdir = config['paths']['tempdir']
-    figdir = config['paths']['figdir']
 
     # choose which data to load
     SCENARIO = config["config"]["scenarios"][config["config"]["scenario"]]
@@ -161,4 +155,11 @@ if __name__ == "__main__":
     df_l4_melted.to_csv(os.path.join(outdir, 'monthly_los_level4_melted.csv'))
 
     print(f"Finished processing LoS data for {SCENARIO}. Outputs saved to {outdir}.")
+
+
+if __name__ == "__main__":
+    wd = os.path.join(os.path.dirname(__file__), "../..")
+    os.chdir(wd); print(f"Working directory: {os.getcwd()}")
+    config = utils.load_config()
+    main(config)
 # %%

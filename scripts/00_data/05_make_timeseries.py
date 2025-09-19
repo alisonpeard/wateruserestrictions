@@ -1,14 +1,17 @@
 """
 Load the processed LoS data and combine with indicator data to create a full timeseries.
 
-Input files:
-    1. <indir>/<SCENARIO>/indicator_series.parquet
-    2. <indir>/<SCENARIO>/standardised_series.parquet
-    3. <indir>/<SCENARIO>/monthly_los_melted.csv
+Params:
+    - config["config"]["scenario"]
+    - config["config"]["variable"]
 
+Inputs:
+    - os.path.join(config['paths']['tempdir'], 'indicators', {scenario}, 'indicator_series.parquet')
+    - os.path.join(config['paths']['tempdir'], 'indicators', SCENARIO, 'standardised_series.parquet')
+    - os.path.join(config['paths']['tempdir'], 'los', {scenario}, f"monthly_los_level{level}_melted.csv")
 
-Output files:
-    1. <outdir>/full_timeseries/<VERSION>/<SCENARIO>/full_timeseries/ts_with_levels.csv
+Outputs:
+    - os.path.join(config['paths']['resultsdir'], 'ts_with_levels.csv')
 """
 #%%
 import os
@@ -47,15 +50,10 @@ def add_los_level(ts, level:int, dir:str):
     return ts
 
 
-if __name__ == "__main__":
-    # setup
-    wd = os.path.join(os.path.dirname(__file__), "../..")
-    os.chdir(wd); print(f"Working directory: {os.getcwd()}")
-    config = utils.load_config()
+def main(config):
     
     indir = config['paths']['tempdir']
     outdir = config['paths']['resultsdir']
-    figdir = config['paths']['figdir']
 
     SCENARIO = config["config"]["scenarios"][config["config"]["scenario"]]
     VARIABLE = config["config"]["variables"][config["config"]["variable"]]
@@ -108,5 +106,14 @@ if __name__ == "__main__":
 
     # save time series
     ts.to_csv(os.path.join(outdir, 'ts_with_levels.csv'))
+
     print(f"Saved full timeseries to {os.path.join(outdir, 'ts_with_levels.csv')}")
+
+
+if __name__ == "__main__":
+    # setup
+    wd = os.path.join(os.path.dirname(__file__), "../..")
+    os.chdir(wd); print(f"Working directory: {os.getcwd()}")
+    config = utils.load_config()
+    main(config)
 # %%

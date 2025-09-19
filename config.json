@@ -10,6 +10,8 @@
         "variable": 0,
         "scenarios": ["hist", "nf", "ff"],
         "variables": ["ep", "prbc"],
-        "uk_crs": "EPSG:27700"
+        "uk_crs": "EPSG:27700",
+        "buffers":[5000, 10000, 25000, 50000, 100000, 150000, 200000, 500000],
+        "backcasts": [3, 6, 12, 24, 36]
     }
 }
