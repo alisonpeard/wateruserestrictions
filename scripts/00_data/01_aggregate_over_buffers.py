@@ -10,9 +10,8 @@ Inputs:
 
 Outputs:
     - os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'aggregated_series.parquet')
-
-
 """
+# %%
 import os
 import zipfile
 
@@ -23,7 +22,7 @@ from tqdm import tqdm
 import utils
 
 
-YEARS = {'BS': range(1975, 2004+1), 'NF': range(2020, 2049+1), 'FF': range(2070, 2099+1)}
+YEARS = {'bs': range(1975, 2004+1), 'nf': range(2020, 2049+1), 'ff': range(2070, 2099+1)}
 
 
 def condition_scenario(filename, year):
@@ -66,6 +65,7 @@ def read_wah(scenarios, datadir):
     """Read all WAH data files for one or more scenarios."""
 
     # List will contain one dataframe per year for each WAH scenario
+
     dfs = []
 
     for scenario in (pbar := tqdm(scenarios)):
@@ -136,7 +136,7 @@ def create_buffered_extents(tempdir, wrz_basins):
     return extents
 
 
-def get_wah_coords(datadir, scenario='NF'):
+def get_wah_coords(datadir, scenario='nf'):
     """ Get coordinates of all grid cell centres in WAH dataset."""
     wahpath = os.path.join(datadir, 'w@h', f"{scenario}.zip")
 
@@ -174,17 +174,16 @@ def identify_relevant_points(tempdir, wah_coords):  # wrz_buffer, wrz_row,
     return gdf
 
 
-def aggregate_spatially(tempdir, df, buffered_extents, scenarios=['BS', 'NF', 'FF']):
-    for scenario in (pbar := tqdm(scenarios)):
-        pbar.set_description(f"Aggregating WRZs in {scenario}")
+def aggregate_spatially(tempdir, df, buffered_extents, scenarios=['bs', 'nf', 'ff']):
+    for scenario in scenarios:
 
-        ensemble_group = [scenario + str(i) for i in range(1, 100+1)]
+        ensemble_group = [scenario.upper() + str(i) for i in range(1, 100+1)]
         df_sub = df.loc[df['ensemble'].isin(ensemble_group)]
 
         gdf = gpd.GeoDataFrame(df_sub, geometry=gpd.points_from_xy(df_sub['lon'], df_sub['lat']), crs="EPSG:4326")
 
         dfs = []
-        for _, row in buffered_extents.iterrows():
+        for _, row in tqdm(buffered_extents.iterrows(), desc=f"Aggregating WRZs in {scenario}", total=len(buffered_extents)):
             wah_df = gpd.clip(gdf, row['geometry'])
             df_agg = wah_df.groupby(['Variable', 'ensemble', 'Year', 'Month'])['Value'].mean().reset_index()
             df_agg['RZ_ID'] = row['RZ_ID']
@@ -199,7 +198,7 @@ def aggregate_spatially(tempdir, df, buffered_extents, scenarios=['BS', 'NF', 'F
         df_agg.to_parquet(output_path, index=False)
 
 
-def main(config, scenarios=["BS", "NF", "FF"]):
+def main(config, scenarios=["bs", "nf", "ff"]):
     datadir = config['paths']["datadir"]
     tempdir = config['paths']["tempdir"]
 
@@ -218,3 +217,5 @@ if __name__ == '__main__':
     os.chdir(wd); print(f"Working directory: {os.getcwd()}")
     config = utils.load_config()
     main(config)
+
+# %%

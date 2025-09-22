@@ -26,6 +26,9 @@ library(patchwork)
 library(stargazer)
 source("fitutils.R")
 
+
+`%ni%` <- Negate(`%in%`)
+
 # setup env
 bdir <- '/Users/alison'
 wdir <- paste0(bdir, '/Documents/RAPID/correlation-analysis')
@@ -34,7 +37,8 @@ res.dir <- paste0(wdir, '/data/results')
 
 # ----Variables----
 SCENARIO <- 'ff'
-ENSEMBLE <- paste0(toupper(SCENARIO), '2')
+# ENSEMBLE <- paste0(toupper(SCENARIO), '2') 10-09-2025
+N_TRAIN <- 2
 
 # subset rz_keys by what time series are available
 ts.path <- paste0(data.dir, '/', SCENARIO, '/ts_with_levels.csv')
@@ -128,9 +132,9 @@ if(FALSE){
           df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
           
           # training subset by ensemble
-          train <- df[df$ensemble <= ENSEMBLE,]
-          test <- df[df$ensemble > ENSEMBLE,]
-          n <- nrow(train)
+          #train <- df[df$ensemble <= ENSEMBLE, ]
+          #test <- df[df$ensemble > ENSEMBLE, ]
+          #n <- nrow(train)
           
           # training subset by 30-member ensemble
           set.seed(2)
@@ -141,8 +145,13 @@ if(FALSE){
             SEED <- sample(1:999, 1)
             set.seed(SEED)
             
+            # Randomly sample two ensemble members to train on
+            ensemble_k <- paste0(SCENARIO, sample(c(1:99), N_TRAIN))
+            train <- df[df$ensemble %in% ensemble_k, ]
+            test <- df[df$ensemble %ni%, ensemble_k, ]
+            
             # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
-            regressors <- c(INDICATOR, sapply(windows, function(x){paste0(INDICATOR, '.', LAG.MODE, '.', TYPE, x)}))
+            regressors <- c(INDICATOR, sapply(windows, function(x) {paste0(INDICATOR, '.', LAG.MODE, '.', TYPE, x)}))
             res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
             rows[[run]] <- res$summary
             print(res$summary)

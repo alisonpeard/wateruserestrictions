@@ -40,9 +40,9 @@ def subset_column(df, column, value):
     return df
 
 
-def add_los_level(ts, level:int, dir:str):
+def add_los_level(ts, level:int, dir:str, scenario:str=None):
     level_df = pd.read_csv(os.path.join(dir, f"monthly_los_level{level}_melted.csv"), index_col=[0])
-    level_df['ensemble'] = level_df['Ensemble'].apply(lambda x: "{}{}".format(SCENARIO.upper(), x))
+    level_df['ensemble'] = level_df['Ensemble'].apply(lambda x: "{}{}".format(scenario, x))
     level_df = level_df.drop(columns='Ensemble')
     ts_level = create_ts(level_df)
     ts_level["LoS"] = ts_level["LoS"].astype(int)
@@ -99,10 +99,10 @@ def main(config):
 
     los_dir = os.path.join(indir, 'los', SCENARIO)
 
-    ts = add_los_level(ts, 1, los_dir)
-    ts = add_los_level(ts, 2, los_dir)
-    ts = add_los_level(ts, 3, los_dir)
-    ts = add_los_level(ts, 4, los_dir)
+    ts = add_los_level(ts, 1, los_dir, SCENARIO.upper())
+    ts = add_los_level(ts, 2, los_dir, SCENARIO.upper())
+    ts = add_los_level(ts, 3, los_dir, SCENARIO.upper())
+    ts = add_los_level(ts, 4, los_dir, SCENARIO.upper())
 
     # save time series
     ts.to_csv(os.path.join(outdir, 'ts_with_levels.csv'))

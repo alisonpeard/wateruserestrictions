@@ -11,8 +11,8 @@ Outputs:
     - os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'thresholds.csv')
     - os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'indicator_series.parquet')
 """
+# %%
 import os
-
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -51,19 +51,20 @@ def calculate_indicators(tempdir, scenario, df, df_thresholds):
 
     df = df.drop(columns=['mean', 'q50', 'q75', 'q90'])
 
-    output_path = os.path.join(tempdir, scenario.lower(), 'indicator_series.parquet')
+    output_path = os.path.join(tempdir, scenario, 'indicator_series.parquet')
     df.to_parquet(output_path, index=False)
 
 
-def main(config, scenarios=["BS", "NF", "FF"]):
+def main(config, scenarios=["bs", "nf", "ff"]):
     tempdir = config['paths']["tempdir"]
 
     for scenario in (pbar := tqdm(scenarios)):
         pbar.set_description(f"Calculating indicators {scenario}")
 
-        input_path = os.path.join(tempdir, scenario.lower(), 'aggregated_series.parquet')
+        input_path = os.path.join(tempdir, scenario, 'aggregated_series.parquet')
         df_agg = pd.read_parquet(input_path)
         df_thresholds = calculate_thresholds(tempdir, scenario, df_agg)
+
         calculate_indicators(tempdir, scenario, df_agg, df_thresholds)
 
 
@@ -72,3 +73,4 @@ if __name__ == '__main__':
     os.chdir(wd); print(f"Working directory: {os.getcwd()}")
     config = utils.load_config()
     main(config)
+# %%

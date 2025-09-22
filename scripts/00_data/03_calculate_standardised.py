@@ -10,6 +10,7 @@ Outputs:
     - os.path.join(config['paths']["tempdir"], {scenario}, 'standardised_series.parquet')
     - os.path.join(config['paths']["tempdir"], {scenario}, "si_plots", "{distribution}_win{window}_{buffer}_{variable}_{ensemble}_{RZ_ID}.png")
 """
+# %%
 import os
 import itertools
 
@@ -19,7 +20,6 @@ import scipy.stats
 import matplotlib.pyplot as plt
 
 import utils
-
 
 def calculate_rolling_sums(df, factor_columns, value_column, window, time_columns=['Year', 'Month']):
     # handles dataframe with factor columns
@@ -35,7 +35,7 @@ def calculate_rolling_sums(df, factor_columns, value_column, window, time_column
 
 def fit_distribution(
         df, factor_columns, value_column, tempdir, window, scenarios=['BS', 'NF', 'FF'], month_column='Month', variable=None,
-        distributions={'prbc': [scipy.stats.gamma], 'ep': [scipy.stats.genextreme]},
+        variable_column='Variable', distributions={'prbc': [scipy.stats.gamma], 'ep': [scipy.stats.genextreme]},
         save_plots=True,
 ):
     # could also calculate and save goodness-of-fit metrics
@@ -59,12 +59,9 @@ def fit_distribution(
     for detail in ['distribution', 'window', 'shape', 'loc', 'scale', 'success', 'message', 'nllf']:
         fitting_details[detail] = []
 
-    # Attempt to be flexible on the number of factors in the dataframe (i.e. fitting for factor combinations)
-    factor_values = []
-    for factor_column in factor_columns:
-        factor_values.append(df[factor_column].unique().tolist())
+    factor_combinations = df.groupby(factor_columns).first().index
 
-    for _factor_values in itertools.product(*factor_values):
+    for _factor_values in factor_combinations:
         df1 = df0
         for factor_column, factor_value in zip(factor_columns, _factor_values):
             df1 = df1.loc[df1[factor_column] == factor_value]
@@ -183,9 +180,7 @@ def calculate_indices(
     # assumes that index is in order
 
     # Again part of attempt to make flexible re number of factors in dataframe
-    factor_values = []
-    for factor_column in factor_columns:
-        factor_values.append(df[factor_column].unique().tolist())
+    factor_combinations = df.groupby(factor_columns).first().index
 
     # Check order - still needed?
     df = df.sort_values(['RZ_ID', 'buffer', 'Variable', 'ensemble', 'Year', 'Month'])
@@ -205,7 +200,7 @@ def calculate_indices(
 
         df_pars1 = df_pars.loc[df_pars['window'] == window]
 
-        for _factor_values in itertools.product(*factor_values):
+        for _factor_values in factor_combinations:
             print('calculating indices:', scenario, window, _factor_values)
 
             df2 = df1
@@ -290,7 +285,11 @@ def main(config, scenarios=["bs", "nf", "ff"]):
 
 
 if __name__ == '__main__':
+
     wd = os.path.join(os.path.dirname(__file__), "../..")
     os.chdir(wd); print(f"Working directory: {os.getcwd()}")
     config = utils.load_config()
+
     main(config)
+
+# %%

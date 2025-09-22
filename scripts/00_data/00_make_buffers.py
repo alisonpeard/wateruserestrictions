@@ -14,6 +14,7 @@ Outputs:
     - os.path.join(config['paths']["tempdir"], 'wrz.gpkg')
     - os.path.join(config['paths']["tempdir"], 'wrz_buffer.gpkg')
 """
+# %%
 import os
 os.environ['USE_PYGEOS'] = '0'
 import utils
@@ -64,7 +65,5 @@ if __name__ == "__main__":
     os.chdir(wd); print(f"Working directory: {os.getcwd()}")
     config = utils.load_config()
     main(config)
-
-
-
-
+    
+# %%
