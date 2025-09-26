@@ -10,8 +10,9 @@ library(pROC)
 library(pracma)
 library(stringr) # for title case
 library(patchwork)
-library(stargazer)
+library(stargazer) # to view results
 library(rjson)
+library(ggthemes) # for plotting
 
 WRZ <- "london"
 INDICATORS <- c('si12')
@@ -82,16 +83,41 @@ res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
 
 get_top_n_coefs <- function(res, n = 3, type = "ber.") {
   coefs <- names(res)[grepl(type, names(res))]
+  coefs <- coefs[!grepl("intercept", coefs)]
   values <- unlist(res[coefs])
   inds <- order(abs(values), decreasing = TRUE)
   top_n <- names(values)[head(inds, n)]
-  sub(type, '', top_n, fixed = TRUE)
+  
+  values <- res[top_n]
+  keys <- sub(type, '', top_n, fixed = TRUE)
+  
+  return(list(
+    keys = keys,
+    values = values
+  ))
 }
 
 ber.coefs <- get_top_n_coefs(res$summary)
 bin.coefs <- get_top_n_coefs(res$summary, type = "bin.")
 
 # ----Results----
+
+theme_custom <- function() {theme(
+  text = element_text(size = 12),
+  panel.grid = element_blank(),
+  panel.grid.major.y = element_line(
+    colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
+  panel.grid.major.x =element_line(
+    colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
+  plot.title.position = 'plot',
+  legend.position = 'right',
+  legend.title = element_blank(),
+  axis.line=element_line(color = "black")
+)}
+
+blues <- c("#193976", "#4C84E0", "#A0C4FF")
+oranges <- c("#B91C1C", "#F26C4F", "#FDD292")
+
 if(TRUE){
   look.at <- 'FF1'
   preds <- res$fitted
@@ -104,21 +130,49 @@ if(TRUE){
   title <- paste0('ZABI GLM fitted values for ', wrz_label, ' (', look.at, ')')
   p1 <- ggplot(preds.subset) + theme_bw() + 
     geom_polygon(data=conf.int, aes(x=x, y=y, group=group, fill='Q60 - Q40'), alpha=0.5) +
-    geom_path(data=conf.int, aes(x=x, y=y, group=group), colour='lightblue', alpha=0.5) +
-    geom_line(aes(y=q50, x=Date, col='Q50 predictions'), cex=.1) +
+    geom_path(data=conf.int, aes(x=x, y=y, group=group), colour="lightblue", alpha=0.5) +
+    geom_line(aes(y=q50, x=Date, col='Q50 predictions'), cex=.2) +
     geom_point(aes(y=y[,2], x=Date, col='Observations'), pch=20) +
-    geom_point(aes(y=q50, x=Date, col='Q50 predictions'), pch=1, cex=.8) +
+    geom_point(aes(y=q50, x=Date, col='Q50 predictions'), pch=1, cex=1) +
     xlab("Year") + ylab("WUR Days") + 
     ggtitle(title) + 
     scale_color_manual(values=c("Observations"="black", "Q50 predictions"="blue")) + 
     scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   
-  p2 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=get(INDICATOR))) +
-    xlab("Year") + ylab(toupper(INDICATOR))
+  keys <- ber.coefs$keys
+  vals <- c(1,1,1) #ber.coefs$values # or c(1,1,1)
   
-  p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
+  p2 <- ggplot(preds.subset) + theme_bw() + 
+    geom_line(aes(x=Date, y=get(keys[1]) * vals[[1]], col=keys[1])) +
+    geom_line(aes(x=Date, y=get(keys[2]) * vals[[2]], col=keys[2])) +
+    geom_line(aes(x=Date, y=get(keys[3]) * vals[[3]], col=keys[3])) +
+    xlab("Year") + ylab("Top 3 Bernoulli indicators") +
+    scale_color_manual(
+      name = NULL,
+      values = setNames(oranges, keys[1:3]),
+      labels = keys[1:3]
+    ) +
+    guides(fill = "none") +
+    theme_custom()
+
+  keys <- bin.coefs$keys
+  vals <- c(1,1,1) # bin.coefs$values
+  
+  p3 <- ggplot(preds.subset) + theme_bw() + 
+    geom_line(aes(x=Date, y=get(keys[1]) * vals[[1]], col=keys[1])) +
+    geom_line(aes(x=Date, y=get(keys[2]) * vals[[2]], col=keys[2])) +
+    geom_line(aes(x=Date, y=get(keys[3]) * vals[[3]], col=keys[3])) +
+    xlab("Year") + ylab("Top 3 binomial indicators") +
+    scale_color_manual(
+      name = NULL,
+      values = setNames(oranges, keys[1:3]),
+      labels = keys[1:3]
+    ) +
+    guides(fill = "none") +
+    theme_custom()
+  
+  p1 + p2 + p3 + plot_layout(nrow=3, heights=c(2,0.5,0.5))
 } # plot fit
 
 if(TRUE){
@@ -144,10 +198,38 @@ if(TRUE){
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   
   p2 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=get(INDICATOR))) +
-    xlab("Year") + ylab(toupper(INDICATOR))
+    geom_line(aes(x=Date, y=get(INDICATOR)), col="lightgrey", linewidth=0.5) +
+    geom_line(aes(x=Date, y=get(ber.coefs[1]), col=ber.coefs[1])) +
+    geom_line(aes(x=Date, y=get(ber.coefs[2]), col=ber.coefs[2])) +
+    geom_line(aes(x=Date, y=get(ber.coefs[3]), col=ber.coefs[3])) +
+    xlab("Year") + ylab("Top 3 Bernoulli indicators") +
+    scale_color_manual(
+      name = NULL,
+      values = setNames(
+        oranges, 
+        ber.coefs[1:3] 
+      ),
+      labels = ber.coefs
+    ) +
+    guides(fill = "none")
   
-  p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
+  p3 <- ggplot(preds.subset) + theme_bw() + 
+    geom_line(aes(x=Date, y=get(INDICATOR)), col="lightgrey", linewidth=0.5) +
+    geom_line(aes(x=Date, y=get(bin.coefs[1]), col=bin.coefs[1])) +
+    geom_line(aes(x=Date, y=get(bin.coefs[2]), col=bin.coefs[2])) +
+    geom_line(aes(x=Date, y=get(bin.coefs[3]), col=bin.coefs[3])) +
+    xlab("Year") + ylab("Top 3 binomial indicators") +
+    scale_color_manual(
+      name = NULL,
+      values = setNames(
+        oranges, 
+        bin.coefs[1:3] 
+      ),
+      labels = bin.coefs
+    ) +
+    guides(fill = "none")
+  
+  p1 + p2 + p3 + plot_layout(nrow=3, heights=c(2,0.5,0.5))
 } # plot predictions
 
 if(TRUE) {
@@ -175,21 +257,6 @@ if(TRUE) {
     ) |>
     filter(count >= 10) |>  # Only keep bins with sufficient data
     arrange(p)
-  
-  library(ggthemes)
-  theme_custom <- function() {theme(
-    text = element_text(size = 12),
-    panel.grid = element_blank(),
-    panel.grid.major.y = element_line(
-      colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
-    panel.grid.major.x =element_line(
-      colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
-    plot.title.position = 'plot',
-    legend.position = 'top',
-    legend.title = element_blank(),
-    axis.line=element_line(color = "black")
-  )}
-  
 
   ggplot(reliability, aes(x = p, y = y)) +
     geom_point(aes(size = count), alpha = 1, pch = 1) +
