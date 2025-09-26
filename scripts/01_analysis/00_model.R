@@ -14,15 +14,15 @@ library(stargazer)
 library(rjson)
 
 WRZ <- "london"
-INDICATOR <- 'si12'
+INDICATORS <- c('si12')
 TREND <- FALSE
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
 
-setwd("/Users/alison/Documents/RAPID/_analysis/wateruserestrictions/scripts/01_analysis")
+setwd("/Users/alison/Documents/drought-indicators/analysis/wateruserestrictions/scripts/01_analysis")
 
 source("utils.R")
 
-setwd("/Users/alison/Documents/RAPID/_analysis/wateruserestrictions/scripts/01_analysis/../..")
+setwd("/Users/alison/Documents/drought-indicators/analysis/wateruserestrictions/scripts/01_analysis/../..")
 
 config <- fromJSON(file="config.json")
 
@@ -40,12 +40,11 @@ df <- na.omit(df)
 df <- df[df$RZ_ID == rz_id, ]
 df$LoS.binary <- as.numeric(df$LoS > 0)
 df$n <- lubridate::days_in_month(df$Date)
-df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATOR, 'ensemble', 'n', 'Date')])
+df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATORS, 'ensemble', 'n', 'Date')])
 
 # add moving average and decomposition terms
-INDICATORS <- c(INDICATOR)
 windows <- c(2, 3, 6, 9, 12, 24) # length of MA windows (in months) 
-types <- c("s", "t") # , "m", "e", "r") # type of MA: s=simple, t=triangular, m=modified, e=exponential, r=recursive
+types <- c("s") # , "m", "e", "r") # type of MA: s=simple, t=triangular, m=modified, e=exponential, r=recursive
 
 if(TREND) {
   for(INDICATOR in INDICATORS){ # decompose
@@ -71,19 +70,30 @@ df$y.ber <- y.ber
 df$y.bin <- y.bin
 df <- na.omit(df[, c('y.bin', 'y.ber', INDICATORS, 'Date', 'ensemble', 'n')])
 
-# training subset by ensemble
+# training subset by ensembles 1 & 2
 ENSEMBLE <- paste0(toupper(scenario), '2')
 train <- df[df$ensemble <= ENSEMBLE,]
 test <- df[df$ensemble > ENSEMBLE,]
 n <- nrow(train)
 
 # Fit the ZABI model
-regressors <- c(INDICATOR, sapply(windows, function(x) {paste0(INDICATOR, '.ma.s', x)}))
+regressors <- c(INDICATOR, sapply(windows, function(x) {paste0(INDICATOR, '.ma.', types, x)}))
 res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
+
+get_top_n_coefs <- function(res, n = 3, type = "ber.") {
+  coefs <- names(res)[grepl(type, names(res))]
+  values <- unlist(res[coefs])
+  inds <- order(abs(values), decreasing = TRUE)
+  top_n <- names(values)[head(inds, n)]
+  sub(type, '', top_n, fixed = TRUE)
+}
+
+ber.coefs <- get_top_n_coefs(res$summary)
+bin.coefs <- get_top_n_coefs(res$summary, type = "bin.")
 
 # ----Results----
 if(TRUE){
-  look.at <- 'FF1'#ENSEMBLE
+  look.at <- 'FF1'
   preds <- res$fitted
   preds.subset <- preds[preds$ensemble == look.at,]
   preds.subset$y <- preds.subset$y.bin
@@ -103,9 +113,11 @@ if(TRUE){
     scale_color_manual(values=c("Observations"="black", "Q50 predictions"="blue")) + 
     scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
+  
   p2 <- ggplot(preds.subset) + theme_bw() + 
     geom_line(aes(x=Date, y=get(INDICATOR))) +
     xlab("Year") + ylab(toupper(INDICATOR))
+  
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot fit
 
@@ -130,10 +142,76 @@ if(TRUE){
     scale_color_manual(values=c("Observations"="black", "Q50 predictions"="blue")) + 
     scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
+  
   p2 <- ggplot(preds.subset) + theme_bw() + 
     geom_line(aes(x=Date, y=get(INDICATOR))) +
     xlab("Year") + ylab(toupper(INDICATOR))
+  
   p1 + p2 + plot_layout(nrow=2, heights=c(2,1))
 } # plot predictions
+
+if(TRUE) {
+  library(ggplot2)
+  
+  length.out <- 50
+  
+  probs <- preds$ber.p
+  obs <- preds$y.ber[,2]
+  
+  breaks <- quantile(probs, probs = seq(0, 1, length.out = length.out), na.rm = TRUE)
+  breaks <- seq(0, 1, length.out = length.out)
+  labels <- breaks[1:length(breaks)-1]
+  
+  df <- data.frame(probs = probs, obs = obs)
+  df$bin <- cut(df$probs, breaks, labels = labels, include.lowest = TRUE, right = FALSE)
+  
+  reliability <- df |> 
+    group_by(bin) |> 
+    summarise(
+      p = mean(probs, na.rm = TRUE),
+      y = mean(obs, na.rm = TRUE),
+      count = n(),
+      se = sqrt(mean(obs) * (1 - mean(obs)) / n())  # Standard error
+    ) |>
+    filter(count >= 10) |>  # Only keep bins with sufficient data
+    arrange(p)
+  
+  library(ggthemes)
+  theme_custom <- function() {theme(
+    text = element_text(size = 12),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
+    panel.grid.major.x =element_line(
+      colour = "#e3e1e1", linetype = 3, linewidth = 0.5),
+    plot.title.position = 'plot',
+    legend.position = 'top',
+    legend.title = element_blank(),
+    axis.line=element_line(color = "black")
+  )}
+  
+
+  ggplot(reliability, aes(x = p, y = y)) +
+    geom_point(aes(size = count), alpha = 1, pch = 1) +
+    geom_errorbar(aes(ymin = y - 1.96*se, ymax = y + 1.96*se), width = 0.02) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
+    xlim(0, 1) + ylim(0, 1) +
+    labs(x = "Mean Predicted Probability", 
+         y = "Mean Observed Frequency",
+         title = "Reliability Diagram",
+         size = "Count") +
+    theme_minimal() +
+    theme_custom()
+  
+  # Calculate Brier score decomposition
+  brier_score <- mean((probs - obs)^2)
+  reliability_component <- sum(reliability$count * (reliability$p - reliability$y)^2) / length(probs)
+  resolution_component <- sum(reliability$count * (reliability$y - mean(obs))^2) / length(probs)
+  
+  cat("Brier Score:", round(brier_score, 4), "\n")
+  cat("Reliability (lower is better):", round(reliability_component, 4), "\n")
+  cat("Resolution (higher is better):", round(resolution_component, 4), "\n")
+} # reliability diagram
+
 
 stargazer(res$summary, type='text') # evaluation metrics

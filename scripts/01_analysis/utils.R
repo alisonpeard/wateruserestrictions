@@ -127,21 +127,56 @@ rmse <- function(y, f) {
   round(rmse, 4)
 }
 
-cts.metrics <- function(y, f, p, label='indicator') {
+cts.metrics <- function(y, f, mu, n, label='indicator') {
   score.rmse <- rmse(y, f)
+  score.crps <- crpsBI(y, n, mu)
   
-  metric.names <- c('RMSE')
-  metrics <- matrix(nrow=1, ncol=1, dimnames=list(NULL,metric.names))
-  metrics[1, ] <- c(score.rmse)
+  metric.names <- c('RMSE', "CRPS (WUR days)")
+  metrics <- matrix(nrow=1, ncol=length(metric.names), dimnames=list(NULL,metric.names))
+  metrics[1, ] <- c(score.rmse, score.crps)
   metrics <- as.data.frame(metrics)
   rownames(metrics) <- label
   metrics
 }
 
+crpsBI <- function(y, n, mu) {
+  crps <- numeric(length(y))
+  for (i in seq_along(y)) {
+    y_i <- y[i]
+    n_i <- n[i]
+    
+    crps_i <- 0
+    for (k in 0:n_i) {
+      f_k <- pBI(k, bd = n_i, mu = mu[i])
+      o_k <- as.numeric(k >= y_i)
+      crps_i <- crps_i + (f_k - o_k)^2
+    }
+    crps[i] <- crps_i
+  }
+  mean(crps)
+}
+
+crpsZABI <- function(y, n, mu.ber, mu.bin) {
+  crps <- numeric(length(y))
+  for (i in seq_along(y)) {
+    y_i <- y[i]
+    n_i <- n[i]
+    
+    crps_i <- 0
+    for (k in 0:n_i) {
+      f_k <- pZABI(k, mu = mu.bin[i], sigma = mu.ber[i], bd = n_i)
+      o_k <- as.numeric(k >= y_i)
+      crps_i <- crps_i + (f_k - o_k)^2
+    }
+    crps[i] <- crps_i
+  }
+  mean(crps)
+}
+
 # ----Zero-adjusted Binomial model----
-qZABI <- function(p, n, mu, nu) {
-  q.bin <- qBI(p, 1, nu)
-  q.ber <- qBI(p, n, mu)
+qZABI <- function(p, n, mu.bin, mu.ber) {
+  q.bin <- qBI(p, n, mu.bin)
+  q.ber <- qBI(p, 1, mu.ber)
   q.zabi <- c(q.bin * q.ber)
   return(q.zabi)
 }
@@ -184,10 +219,16 @@ bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMB
 }
 
 binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBDA) {
+  # keep full vectors to return
+  train_full <- train
+  test_full <- test
+  
   # train on positives only
   train <- train[train[[y]][,2] > 0, ]
   test <- test[test[[y]][,2] > 0, ]
   
+  train_full <- train_full[,c("ensemble", "Date", y, X, "n")]
+  test_full <- test_full[,c("ensemble", "Date", y, X, "n")]
   train <- train[,c("ensemble", "Date", y, X, "n")]
   test <- test[,c("ensemble", "Date", y, X, "n")]
   
@@ -206,15 +247,7 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   colnames(coefs) <- label
   coefs <- t(coefs)
   
-  # fitted values
-  bd <- train$n
-  mu <- as.numeric(mu)
-  train$bin.q50 <- qBI(0.5, bd, mu)
-  train$bin.lower <- qBI(0.025, bd, mu)
-  train$bin.upper <- qBI(0.975, bd, mu)
-  train$bin.p <- mu
-  
-  # predicted values
+  # test metrics on positives only
   bd <- test$n
   mu <- predict(model, newx=as.matrix(test[,X]), type='response')
   mu <- as.numeric(mu)
@@ -224,13 +257,31 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   test$bin.upper <- qBI(0.975, bd, mu)
   test$bin.p <- mu
   
-  # test set metrics
-  metrics <- cts.metrics(test$y.bin[,2], q50, mu, label)
+  metrics <- cts.metrics(test$y.bin[,2], q50, mu, bd, label)
   results <- merge(coefs, metrics)
   
+  # fitted values
+  bd <- train_full$n
+  mu <- predict(model, newx=as.matrix(train_full[,X]), type='response')
+  mu <- as.numeric(mu)
+  train_full$bin.q50 <- qBI(0.5, bd, mu)
+  train_full$bin.lower <- qBI(0.025, bd, mu)
+  train_full$bin.upper <- qBI(0.975, bd, mu)
+  train_full$bin.p <- mu
+  
+  # predicted values
+  bd <- test_full$n
+  mu <- predict(model, newx=as.matrix(test_full[,X]), type='response')
+  mu <- as.numeric(mu)
+  q50 <- qBI(0.5, bd, mu)
+  test_full$bin.q50 <- q50
+  test_full$bin.lower <- qBI(0.025, bd, mu)
+  test_full$bin.upper <- qBI(0.975, bd, mu)
+  test_full$bin.p <- mu
+  
   return(list(
-    fitted=train,
-    predicted=test,
+    fitted=train_full,
+    predicted=test_full,
     summary=results
   ))
 }
@@ -240,6 +291,7 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA) {
   bin <- binomial.glm(train, test, label='si6', X=regressors)
   results <- cbind(ber$summary, bin$summary)
   
+
   # fitted values
   train$ber.p <- ber$fitted$ber.p
   train$bin.p <- merge(train, bin$fitted[,c('bin.p', 'bin.q50')], by=0, all.x=TRUE)$bin.q50
@@ -248,6 +300,7 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA) {
   bd <- train$n
   mu.ber <- ber$fitted$ber.p
   mu.bin <- bin$fitted$bin.p
+  y <- train$y.bin[, 2]
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
   lower <- qZABI(0.4, bd, mu.bin, mu.ber)
   upper <- qZABI(0.6, bd, mu.bin,  mu.ber)
@@ -263,13 +316,14 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA) {
   bd <- test$n
   mu.ber <- test$ber.p
   mu.bin <- test$bin.p
+  y <- test$y.bin[, 2]
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
   lower <- qZABI(0.4, bd, mu.bin, mu.ber)
   upper <- qZABI(0.6, bd, mu.bin,  mu.ber)
   test$q50 <- q50
   test$lower <- lower
   test$upper <- upper
-  
+
   return(list(
     fitted=train,
     predicted=test,
