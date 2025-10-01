@@ -11,13 +11,15 @@ library(pracma)
 library(stringr) # for title case
 library(patchwork)
 library(stargazer) # to view results
-library(rjson)
+library(rjson) # load config
 library(ggthemes) # for plotting
 
 WRZ <- "london"
-INDICATORS <- c('si12')
+INDICATORS <- c('si6')
 TREND <- FALSE
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
+
+set.seed(42) # nb run at same time as fit so it's reprodicible
 
 setwd("/Users/alison/Documents/drought-indicators/analysis/wateruserestrictions/scripts/01_analysis")
 
@@ -44,7 +46,7 @@ df$n <- lubridate::days_in_month(df$Date)
 df <- na.omit(df[, c('LoS', 'LoS.binary', 'RZ_ID', INDICATORS, 'ensemble', 'n', 'Date')])
 
 # add moving average and decomposition terms
-windows <- c(2, 3, 6, 9, 12, 24) # length of MA windows (in months) 
+windows <- c(3, 6, 12, 24) # length of MA windows (in months) 
 types <- c("s") # , "m", "e", "r") # type of MA: s=simple, t=triangular, m=modified, e=exponential, r=recursive
 
 if(TREND) {
@@ -101,7 +103,6 @@ ber.coefs <- get_top_n_coefs(res$summary)
 bin.coefs <- get_top_n_coefs(res$summary, type = "bin.")
 
 # ----Results----
-
 theme_custom <- function() {theme(
   text = element_text(size = 12),
   panel.grid = element_blank(),
@@ -114,6 +115,25 @@ theme_custom <- function() {theme(
   legend.title = element_blank(),
   axis.line=element_line(color = "black")
 )}
+
+convert_keys_to_names <- function(keys) {
+  # Convert keys to readable names
+  readable_names <- sapply(keys, function(key) {
+    if (grepl("\\.ma\\.s\\d+$", key)) {
+      # Extract the number after 's'
+      months <- gsub(".*\\.ma\\.s(\\d+)$", "\\1", key)
+      return(paste0(months, "-month MA"))
+    } else if (grepl("^[a-zA-Z0-9]+$", key) && !grepl("\\.ma\\.", key)) {
+      # Simple key without MA pattern
+      return("Current")
+    } else {
+      # Fallback for any other patterns
+      return(key)
+    }
+  }, USE.NAMES = FALSE)
+  
+  return(readable_names)
+}
 
 blues <- c("#193976", "#4C84E0", "#A0C4FF")
 oranges <- c("#B91C1C", "#F26C4F", "#FDD292")
@@ -129,7 +149,7 @@ if(TRUE){
   # make plots
   title <- paste0('ZABI GLM fitted values for ', wrz_label, ' (', look.at, ')')
   p1 <- ggplot(preds.subset) + theme_bw() + 
-    geom_polygon(data=conf.int, aes(x=x, y=y, group=group, fill='Q60 - Q40'), alpha=0.5) +
+    geom_polygon(data=conf.int, aes(x=x, y=y, group=group, fill='Q10 - Q90'), alpha=0.5) +
     geom_path(data=conf.int, aes(x=x, y=y, group=group), colour="lightblue", alpha=0.5) +
     geom_line(aes(y=q50, x=Date, col='Q50 predictions'), cex=.2) +
     geom_point(aes(y=y[,2], x=Date, col='Observations'), pch=20) +
@@ -137,7 +157,7 @@ if(TRUE){
     xlab("Year") + ylab("WUR Days") + 
     ggtitle(title) + 
     scale_color_manual(values=c("Observations"="black", "Q50 predictions"="blue")) + 
-    scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
+    scale_fill_manual(values = c("Q10 - Q90" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   
   keys <- ber.coefs$keys
@@ -147,11 +167,11 @@ if(TRUE){
     geom_line(aes(x=Date, y=get(keys[1]) * vals[[1]], col=keys[1])) +
     geom_line(aes(x=Date, y=get(keys[2]) * vals[[2]], col=keys[2])) +
     geom_line(aes(x=Date, y=get(keys[3]) * vals[[3]], col=keys[3])) +
-    xlab("Year") + ylab("Top 3 Bernoulli indicators") +
+    xlab("Year") + ylab("Bernoulli\n(Top 3)") +
     scale_color_manual(
       name = NULL,
       values = setNames(oranges, keys[1:3]),
-      labels = keys[1:3]
+      labels = convert_keys_to_names(keys)
     ) +
     guides(fill = "none") +
     theme_custom()
@@ -163,7 +183,7 @@ if(TRUE){
     geom_line(aes(x=Date, y=get(keys[1]) * vals[[1]], col=keys[1])) +
     geom_line(aes(x=Date, y=get(keys[2]) * vals[[2]], col=keys[2])) +
     geom_line(aes(x=Date, y=get(keys[3]) * vals[[3]], col=keys[3])) +
-    xlab("Year") + ylab("Top 3 binomial indicators") +
+    xlab("Year") + ylab("Binomial\n(Top 3)") +
     scale_color_manual(
       name = NULL,
       values = setNames(oranges, keys[1:3]),
@@ -178,7 +198,7 @@ if(TRUE){
 if(TRUE){
   look.at <- 'FF72'
   preds <- res$predicted
-  preds.subset <- preds[preds$ensemble == look.at,]
+  preds.subset <- preds[preds$ensemble == look.at, ]
   preds.subset$y <- preds.subset$y.bin
   preds.subset$Date <- as.Date(preds.subset$Date)
   conf.int <- make.conf.int(preds.subset)
@@ -186,50 +206,50 @@ if(TRUE){
   # make plots
   title <- paste0('ZABI GLM predictions for ', wrz_label, ' (', look.at, ')')
   p1 <- ggplot(preds.subset) + theme_bw() + 
-    geom_polygon(data=conf.int, aes(x=x, y=y, group=group, fill='Q60 - Q40'), alpha=0.5) +
+    geom_polygon(data=conf.int, aes(x=x, y=y, group=group, fill='Q10 - Q90'), alpha=0.5) +
     geom_path(data=conf.int, aes(x=x, y=y, group=group), colour='lightblue', alpha=0.5) +
     geom_line(aes(y=q50, x=Date, col='Q50 predictions'), cex=.1) +
     geom_point(aes(y=y[,2], x=Date, col='Observations'), pch=20) +
     geom_point(aes(y=q50, x=Date, col='Q50 predictions'), pch=1, cex=.8) +
-    xlab("Year") + ylab("WUR Days") + 
-    ggtitle(title) + 
+    ylab("WUR Days") + 
+    xlab("") +
+    #ggtitle(title) + 
     scale_color_manual(values=c("Observations"="black", "Q50 predictions"="blue")) + 
-    scale_fill_manual(values = c("Q60 - Q40" = "lightblue")) +
+    scale_fill_manual(values = c("Q10 - Q90" = "lightblue")) +
     guides(color = guide_legend(title = NULL), fill=guide_legend(title=NULL))
   
+  vals <- c(1,1,1) #ber.coefs$values # or c(1,1,1)
+  
   p2 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=get(INDICATOR)), col="lightgrey", linewidth=0.5) +
-    geom_line(aes(x=Date, y=get(ber.coefs[1]), col=ber.coefs[1])) +
-    geom_line(aes(x=Date, y=get(ber.coefs[2]), col=ber.coefs[2])) +
-    geom_line(aes(x=Date, y=get(ber.coefs[3]), col=ber.coefs[3])) +
-    xlab("Year") + ylab("Top 3 Bernoulli indicators") +
+    geom_line(aes(x=Date, y=get(ber.coefs$keys[1]) * vals[[1]], col=ber.coefs$keys[1])) +
+    geom_line(aes(x=Date, y=get(ber.coefs$keys[2]) * vals[[2]], col=ber.coefs$keys[2])) +
+    geom_line(aes(x=Date, y=get(ber.coefs$keys[3]) * vals[[3]], col=ber.coefs$keys[3])) +
+    xlab("") + ylab("Bernoulli\n(Top 3)") +
     scale_color_manual(
       name = NULL,
-      values = setNames(
-        oranges, 
-        ber.coefs[1:3] 
-      ),
-      labels = ber.coefs
+      values = setNames(oranges[1:3], ber.coefs$keys[1:3]),
+      labels = convert_keys_to_names(ber.coefs$keys[1:3]),
+      breaks = ber.coefs$keys[1:3]
     ) +
-    guides(fill = "none")
+    guides(fill = "none") +
+    theme_custom()
   
+  p1 + p2 + plot_layout(nrow=2, heights=c(2, 0.55))
+
   p3 <- ggplot(preds.subset) + theme_bw() + 
-    geom_line(aes(x=Date, y=get(INDICATOR)), col="lightgrey", linewidth=0.5) +
-    geom_line(aes(x=Date, y=get(bin.coefs[1]), col=bin.coefs[1])) +
-    geom_line(aes(x=Date, y=get(bin.coefs[2]), col=bin.coefs[2])) +
-    geom_line(aes(x=Date, y=get(bin.coefs[3]), col=bin.coefs[3])) +
-    xlab("Year") + ylab("Top 3 binomial indicators") +
+    geom_line(aes(x=Date, y=get(bin.coefs$keys[1]) * vals[[1]], col=bin.coefs$keys[1])) +
+    geom_line(aes(x=Date, y=get(bin.coefs$keys[2]) * vals[[2]], col=bin.coefs$keys[2])) +
+    geom_line(aes(x=Date, y=get(bin.coefs$keys[3]) * vals[[3]], col=bin.coefs$keys[3])) +
+    xlab("Year") + ylab("Binomial top 3") +
     scale_color_manual(
       name = NULL,
-      values = setNames(
-        oranges, 
-        bin.coefs[1:3] 
-      ),
-      labels = bin.coefs
+      values = setNames(oranges, bin.coefs$keys[1:3]),
+      labels = convert_keys_to_names(bin.coefs$keys[1:3])
     ) +
-    guides(fill = "none")
+    guides(fill = "none") +
+    theme_custom()
   
-  p1 + p2 + p3 + plot_layout(nrow=3, heights=c(2,0.5,0.5))
+  p1 + p2 + p3 + plot_layout(nrow=3, heights=c(1.5,0.75,0.75))
 } # plot predictions
 
 if(TRUE) {
@@ -238,7 +258,7 @@ if(TRUE) {
   length.out <- 50
   
   probs <- preds$ber.p
-  obs <- preds$y.ber[,2]
+  obs <- preds$y.ber[, 2]
   
   breaks <- quantile(probs, probs = seq(0, 1, length.out = length.out), na.rm = TRUE)
   breaks <- seq(0, 1, length.out = length.out)
@@ -265,7 +285,7 @@ if(TRUE) {
     xlim(0, 1) + ylim(0, 1) +
     labs(x = "Mean Predicted Probability", 
          y = "Mean Observed Frequency",
-         title = "Reliability Diagram",
+         #title = "Reliability Diagram",
          size = "Count") +
     theme_minimal() +
     theme_custom()
@@ -278,7 +298,58 @@ if(TRUE) {
   cat("Brier Score:", round(brier_score, 4), "\n")
   cat("Reliability (lower is better):", round(reliability_component, 4), "\n")
   cat("Resolution (higher is better):", round(resolution_component, 4), "\n")
+  
+  # Calculate base rate variance (Uncertainty)
+  base_rate <- mean(obs)
+  uncertainty <- base_rate * (1 - base_rate)
+  
+  cat("Uncertainty (base rate variance):", round(uncertainty, 4), "\n")
+  cat("Resolution:", round(resolution_component, 4), "\n")
+  cat("Resolution as % of Uncertainty:", round(100 * resolution_component / uncertainty, 2), "%\n")
 } # reliability diagram
 
-
 stargazer(res$summary, type='text') # evaluation metrics
+
+# CRPS skill score for duration model
+if (TRUE) {
+  mask <- preds$y.ber[, 2] > 0
+  observed_counts <- preds$y.bin[mask, 2]
+  total_days <- preds$n[mask]
+  predicted_probs <- preds$bin.p[mask]
+  
+  model_crps <- crpsBI(y = observed_counts, n = total_days, mu = predicted_probs)
+  
+  # Climatology: predict the mean proportion for every observation
+  mean_proportion <- mean(observed_counts / total_days)
+  climatology_probs <- rep(mean_proportion, length(observed_counts))
+  
+  climatology_crps <- crpsBI(y = observed_counts, n = total_days, mu = climatology_probs)
+  
+  skill_score <- 1 - (model_crps / climatology_crps)
+  
+  cat("Model CRPS:", round(model_crps, 3), "days\n")
+  cat("Climatology CRPS:", round(climatology_crps, 3), "days\n") 
+  cat("CRPS Skill Score:", round(100 * skill_score, 1), "%\n")
+}
+
+# Brier skill score for occurrence model
+if (TRUE) {
+  obs <- preds$y.ber[, 2]
+  probs <- preds$ber.p
+  
+  model_brier <- brier(obs, probs)
+  
+  # Climatology: predict the mean proportion for every observation
+  
+  mean_proportion <- mean(obs > 0)
+  climatology_probs <- rep(mean_proportion, length(obs))
+  
+  climatology_brier <- brier(obs, climatology_probs)
+  
+  skill_score <- 1 - (model_brier / climatology_brier)
+  
+  cat("Model Brier:", round(model_brier, 3), "days\n")
+  cat("Climatology Brier:", round(climatology_brier, 3), "days\n") 
+  cat("Brier Skill Score:", round(100 * skill_score, 1), "%\n")
+}
+

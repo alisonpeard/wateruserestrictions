@@ -1,7 +1,6 @@
 #%%
 import os
 import numpy as np
-import glob
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -16,12 +15,12 @@ def whitespace_remover(dataframe):
 wrz = 'london'
 trend = 'raw'
 lag = 'ma.s'
-scenario = 'FF2'
-datadir = f"/Users/alison/Documents/RAPID/correlation-analysis/data/results/cv/{wrz}/{trend}"
+scenario = 'ff'
+datadir = f"/Users/alison/Documents/drought-indicators/analysis/data/results/cv/{wrz}/{trend}"
 
 binary_metrics = ['BCE', 'Brier']
 confusion_metrics = ['Precision', 'Recall', 'F1', 'F2']
-regression_metrics = ['RMSE']
+regression_metrics = ['RMSE', "CRPS"]
 
 # %%
 dfs = []
@@ -29,6 +28,7 @@ toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.
 ind_rename = {'ep_total': 'EP', 'si6': 'SI6', 'si12': 'SI12', 'si24': 'SI24'}
 trend_rename = {'trend': 'Yes', 'raw': 'No'}
 lag_rename = {'lag.': 'Pointwise', 'ma.s': 'Simple MA', 'ma.t': 'Triangular MA'}
+
 for root, dirs, files in os.walk(datadir):
     for file in files:
         if root.endswith(lag) and file.endswith(f"{scenario}.csv"):
@@ -37,17 +37,14 @@ for root, dirs, files in os.walk(datadir):
             columns = df.columns
             for r in toremove:
                 columns = [x.replace(r, '') for x in columns]
+            
             df.columns = columns
-
-            # df['lag'] = lag_rename[root.split('/')[-1]]
+            df = df.rename(columns={'CRPS..WUR.days.': 'CRPS'})
             df['indicator'] = root.split('/')[-2]
-            # df['trend'] = trend_rename[root.split('/')[-3]]
-            # df['wrz'] = root.split('/')[-4].title()
             dfs.append(df)
+
 df = pd.concat(dfs).reset_index(drop=True).dropna()
-df = df
 df.groupby(['indicator']).mean()
-# fix order
 df = df.set_index('indicator').loc[['ep_total', 'si6', 'si12', 'si24']].reset_index(drop=False)
 
 # %% gridspec test
@@ -82,7 +79,7 @@ df_plot = df.melt(id_vars='indicator', value_vars=['Recall', 'F1', 'F2'], var_na
 sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
 
 ax = ax5
-df_plot = df.melt(id_vars='indicator', value_vars='RMSE', var_name='Metric')
+df_plot = df.melt(id_vars='indicator', value_vars=['CRPS'], var_name='Metric')
 sns.violinplot(data=df_plot, x='indicator', y='value', hue='Metric', ax=ax, **violin_kws)
 ax.set_title('Regression metrics')
 
@@ -107,11 +104,10 @@ sns.violinplot(data=df_plot, x='indicator', y='value', hue='Confusion metric', a
 ax.set_title('Confusion metrics')
 
 ax = axs[2] 
-df_plot = df.melt(id_vars='indicator', value_vars=regression_metrics, var_name='RMSE')
-sns.violinplot(data=df_plot, x='indicator', y='value', hue='RMSE', legend=False, ax=ax, **violin_kws)
+df_plot = df.melt(id_vars='indicator', value_vars=regression_metrics, var_name='CRPS')
+sns.violinplot(data=df_plot, x='indicator', y='value', hue='CRPS', legend=False, ax=ax, **violin_kws)
 ymin, ymax = df_plot['value'].min(), df_plot['value'].max()
-# ax.set_ylim(9.8, 10.3)
-ax.set_title('RMSE')
+ax.set_title('CRPS')
 
 for ax in axs:
     ax.set_ylabel("")
@@ -119,7 +115,6 @@ for ax in axs:
     ax.set_xticks(ax.get_xticks(), ['EP', 'SI6', 'SI12', 'SI24'])
 
 plt.suptitle(f"ZABI metric distributions for {wrz.title().replace('_', ' ')}")
-# del df_plot
 
 # %%
 df_avg = df.groupby("indicator").mean()
@@ -148,7 +143,6 @@ xlabels = ['intercept', 'current'] + xlabels[2:]
 sns.set_style("white")
 
 # set cmap center to 0
-cmap = 'bwr'
 cmap = sns.diverging_palette(220, 20, as_cmap=True)
 
 # sort index
@@ -170,12 +164,12 @@ axs[1].set_title("Binomial coefficients")
 for ax in axs:
     ax.set_xlabel('Lag')
     ax.set_xticklabels(xlabels, rotation=45, ha='right')
-    # ax.set_yticklabels(ylabels, rotation=0)
     ax.set_ylabel('Indicator')
     ax.label_outer()
 
     for _, spine in ax.spines.items():
         spine.set_visible(True)
+
 fig.suptitle(f"Averaged ZABI model coefficients for {wrz.title().replace('_', ' ')}")
 
 # %%

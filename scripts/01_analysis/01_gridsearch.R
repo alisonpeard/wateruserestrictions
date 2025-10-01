@@ -1,14 +1,14 @@
 "
 Run (a) or (b):
-(a) Cycles through all regressor combinations for London and output summary metrics 
-  in ../cv/london/<trend>/<regressor>/<lag mode>/<lag type>/NF2.csv
-(b) Cycles throught the chosen regressor combination for all WRZs and outputs the 
-  same. 
+(a) Cycles through all regressor combinations for London and output summary
+  metrics in ../cv/london/<trend>/<regressor>/<lag mode>/<lag type>/NF2.csv
+(b) Cycles throught the chosen regressor combination for all WRZs and outputs
+  the same. 
 
-Inference code repeats the training procedure 30 times for different
+Inference code repeats the training procedure 100 times for different
 random seeds to produce an ensemble of prediction metrics. The model trains
-on ensemble members NF1 and NF2 then predicts on the remaining 98 NF ensemble members
-and records the metrics.
+on ensemble members NF1 and NF2 then predicts on the remaining 98 NF ensemble
+members and records the metrics.
 
 LASSO regulatisation using cv.glmnet.
 "
@@ -24,63 +24,73 @@ library(pracma)
 library(stringr)    # for title case
 library(patchwork)
 library(stargazer)
-source("fitutils.R")
+library(rjson) # for config
 
+setwd("/Users/alison/Documents/drought-indicators/analysis/wateruserestrictions/scripts/01_analysis")
+
+source("utils.R")
 
 `%ni%` <- Negate(`%in%`)
 
 # setup env
 bdir <- '/Users/alison'
-wdir <- paste0(bdir, '/Documents/RAPID/correlation-analysis')
-data.dir <- paste0(wdir, '/data/results/full_timeseries/240403')
-res.dir <- paste0(wdir, '/data/results')
+wdir <- paste0(bdir, '/Documents/drought-indicators/analysis/wateruserestrictions')
+setwd(wdir)
+
+config <- fromJSON(file='config.json')
+inp.dir <- config$paths$datadir
+res.dir <- config$paths$resultsdir
+data.dir <- paste0(res.dir, '/full_timeseries/')
 
 # ----Variables----
-SCENARIO <- 'ff'
-# ENSEMBLE <- paste0(toupper(SCENARIO), '2') 10-09-2025
+scenario <- config$config$scenarios[config$config$scenario+1] 
 N_TRAIN <- 2
 
 # subset rz_keys by what time series are available
-ts.path <- paste0(data.dir, '/', SCENARIO, '/ts_with_levels.csv')
-rz_keys = read.csv(paste0(wdir, '/data', '/wrz_key.csv'))
+ts.path <- paste0(data.dir, '/', scenario, '/ts_with_levels.csv')
+rz_keys = read.csv(paste0(inp.dir, '/wrz_key.csv')) # NOTE: unsure of source
 df <- read.csv(paste0(ts.path))
 rz_keys <- merge(rz_keys, df, by.y='RZ_ID', by.x='rz_id')
 rz_keys <- unique(rz_keys[c('rz_id', 'wrz')]) # 29 unique
-missing <- read.csv(paste0(data.dir, '/missingdata.csv'))
-missing <- missing[missing$scenario==SCENARIO,]
-valid <- as.numeric(missing[missing$model==1,]$RZ_ID);valid
-rz_keys <- rz_keys[rz_keys$rz_id %in% valid,]
 
-# (a) loop through all regressor options for London
-WRZ <- 'london'
+# Can't remember what this was for
+# missing <- read.csv(paste0(data.dir, '/missingdata.csv'))
+#missing <- missing[missing$scenario==scenario, ]
+#valid <- as.numeric(missing[missing$model==1, ]$RZ_ID);valid
+#rz_keys <- rz_keys[rz_keys$rz_id %in% valid, ]
+
+# (a) loop through all indicators for single WRZ
+WRZ <- 'ruthamford_north'
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
 RZ_ID <- RZ_IDS[[WRZ]]
+K <- 100 # bootstrap samples
+windows <- c(3, 6, 12, 24) # length of lag/MA windows (in months) 
 
 INDs <- c('ep_total', 'si6', 'si12', 'si24')
-TREND.MODES <- c('raw', 'trend')
+TREND.MODES <- c('raw')#, 'trend')
 LAG.MODES <- c('lag', 'ma')
-TYPES <- c("s", "t")
+TYPES <- c("s")#, "t")
 
-if(FALSE){
-  for(x in 1:length(INDs)){
-    for(y in 1:length(TREND.MODES)){
-      for(z in 1:length(LAG.MODES)){
-        for(w in 1:length(TYPES)){
+if(TRUE) {
+  for(x in 1:length(INDs)) {
+    for(y in 1:length(TREND.MODES)) {
+      for(z in 1:length(LAG.MODES)) {
+        for(w in 1:length(TYPES)) {
           # set up vars
           INDICATOR.BASE <- INDs[x]
           INDICATOR <- INDICATOR.BASE
           TREND.MODE <- TREND.MODES[y]
           LAG.MODE <- LAG.MODES[z]
           TYPE = TYPES[w]
-          print(paste(x,y,z,w))
+          print(paste(x, y, z, w))
           print(paste('Training on:', INDICATOR.BASE, TREND.MODE, LAG.MODE, TYPE))
           
-          WRZLABEL <- str_to_title(gsub("_", " ", WRZ))
-          print(paste0('Fitting on ',WRZ))
+          WRZLABEL <- str_to_title(gsub("_", "", WRZ))
+          print(paste0('Fitting on ', WRZ))
           
           # load and process data
           df <- read.csv(paste0(ts.path))
-          df <- df[df$RZ_ID == RZ_ID,]
+          df <- df[df$RZ_ID == RZ_ID, ]
           df <- na.omit(df)
           df$LoS.binary <- as.numeric(df$LoS > 0)
           df$n <- lubridate::days_in_month(df$Date)
@@ -88,32 +98,31 @@ if(FALSE){
           
           # add moving average and decomposition terms
           INDICATORS <- c(INDICATOR)
-          windows <- c(2, 3, 6, 9, 12, 24) # length of MA windows (in months) 
           types <- c(TYPE)
-          if(TREND.MODE == 'trend'){
-            for(j in length(INDICATORS)){ # decompose
+          if(TREND.MODE == 'trend') {
+            for(j in length(INDICATORS)) { # decompose
               df <- ensemblewise(decompose.column, df, INDICATOR)
               INDICATORS[j] <- paste0(INDICATOR, '.trend')
             } # decompose
           }
-          if(LAG.MODE == 'ma'){
-            for(INDICATOR in INDICATORS){ # moving average
-              for(i in seq_along(windows)){ 
-                for(j in seq_along(types)){
+          if(LAG.MODE == 'ma') {
+            for(INDICATOR in INDICATORS) { # moving average
+              for(i in seq_along(windows)) { 
+                for(j in seq_along(types)) {
                   df <- ensemblewise(movavg.column, df, INDICATOR, windows[i], types[j])
                   INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.ma.', types[j], windows[i]))
                 }
               }
             }
-          }else if(LAG.MODE == 'lag'){
+          }else if(LAG.MODE == 'lag') {
             if(TYPE == 's'){ # prevent doing same thing twice for 't' and 's'
               TYPE <- ''
             }else{
               print("Skipping repeat lag loop")
               next
             }
-            for(INDICATOR in INDICATORS){ # pointwise lags
-              for(i in seq_along(windows)){ 
+            for(INDICATOR in INDICATORS) { # pointwise lags
+              for(i in seq_along(windows)) { 
                 df <- ensemblewise(lag.column, df, INDICATOR, windows[i])
                 INDICATORS <- c(INDICATORS, paste0(INDICATOR, '.lag.', windows[i]))
               }
@@ -138,22 +147,21 @@ if(FALSE){
           
           # training subset by 30-member ensemble
           set.seed(2)
-          K <- 30
           rows <- vector("list", K) 
-          for(run in 1:K){
-            print(paste0("Training with seed number: ", run))
+          for(k in 1:K) {
+            print(paste0("Training with seed number: ", k))
             SEED <- sample(1:999, 1)
             set.seed(SEED)
             
             # Randomly sample two ensemble members to train on
-            ensemble_k <- paste0(SCENARIO, sample(c(1:99), N_TRAIN))
-            train <- df[df$ensemble %in% ensemble_k, ]
-            test <- df[df$ensemble %ni%, ensemble_k, ]
+            ensemble_k <- paste0(scenario, sample(c(1:99), N_TRAIN))
+            train <- df[df$ensemble %in% toupper(ensemble_k), ]
+            test <- df[df$ensemble %ni% toupper(ensemble_k), ]
             
             # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
             regressors <- c(INDICATOR, sapply(windows, function(x) {paste0(INDICATOR, '.', LAG.MODE, '.', TYPE, x)}))
             res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
-            rows[[run]] <- res$summary
+            rows[[k]] <- res$summary
             print(res$summary)
           }
           summary <- data.frame(do.call(rbind, rows))
@@ -162,7 +170,7 @@ if(FALSE){
           summary$rz_id <- RZ_ID
           outdir <- paste0(res.dir, '/cv/', WRZ, '/', TREND.MODE, '/', INDICATOR.BASE, '/', LAG.MODE, '.', TYPE)
           dir.create(outdir, recursive=TRUE)
-          write.csv(summary, paste0(outdir, '/', ENSEMBLE, '.csv'))
+          write.csv(summary, paste0(outdir, '/', scenario, '.csv'))
           print(paste0("Saved!"))
           print(paste('Trained on:', INDICATOR.BASE, TREND.MODE, LAG.MODE, TYPE))
         }
@@ -178,7 +186,7 @@ LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
 K <- 30
 rz_keys <- rz_keys[rz_keys$rz_id %in% c(36, 68, 97, 104, 127),] # to only train on a subset
-if(TRUE){
+if(FALSE){
   rz_keys$success <- FALSE
   for(x in 1:nrow(rz_keys)){
     try({
@@ -250,16 +258,16 @@ if(TRUE){
       # training subset by 30-member ensemble
       set.seed(2)
       rows <- vector("list", K) 
-      for(run in 1:K){
-        # run = 1 # for dev
-        print(paste0("Training with seed number: ", run))
+      for(k in 1:K){
+        # k = 1 # for dev
+        print(paste0("Training with seed number: ", k))
         SEED <- sample(1:999, 1)
         set.seed(SEED)
         
         # First, fit the Bernoulli and Binomial GLMs (on a subset of regressors)
         regressors <- c(INDICATOR, sapply(windows, function(x){paste0(INDICATOR, '.', LAG.MODE, '.', TYPE, x)}))
         res <- zabi.glm(train, test, label=INDICATOR, X=regressors)
-        rows[[run]] <- res$summary
+        rows[[k]] <- res$summary
         print(res$summary)
       }
       summary <- data.frame(do.call(rbind, rows))

@@ -156,22 +156,6 @@ crpsBI <- function(y, n, mu) {
   mean(crps)
 }
 
-crpsZABI <- function(y, n, mu.ber, mu.bin) {
-  crps <- numeric(length(y))
-  for (i in seq_along(y)) {
-    y_i <- y[i]
-    n_i <- n[i]
-    
-    crps_i <- 0
-    for (k in 0:n_i) {
-      f_k <- pZABI(k, mu = mu.bin[i], sigma = mu.ber[i], bd = n_i)
-      o_k <- as.numeric(k >= y_i)
-      crps_i <- crps_i + (f_k - o_k)^2
-    }
-    crps[i] <- crps_i
-  }
-  mean(crps)
-}
 
 # ----Zero-adjusted Binomial model----
 qZABI <- function(p, n, mu.bin, mu.ber) {
@@ -189,7 +173,7 @@ bernoulli.glm <- function(train, test, label, y='y.ber', X=c('si6'), lambda=LAMB
   
   # fit model
   model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family='binomial',
-                     upper.limits=rep(0, length(regressors)))
+                     upper.limits=rep(0, length(regressors)), relax=FALSE)
   mu <- predict(model, newx=as.matrix(train[,X]), type='response', s=lambda)
   coefs <- as.data.frame(as.matrix(coef(model, s=lambda)))
   coef.names <- c('ber.intercept', lapply(X, function(x) paste0('ber.', x)))
@@ -238,7 +222,7 @@ binomial.glm <- function(train, test, label, y='y.bin', X=c('si6'), lambda=LAMBD
   
   # fit Binomial
   model <- cv.glmnet(as.matrix(train[,X]), train[[y]], family="binomial",
-                     upper.limits=rep(0, length(regressors)), nfolds=NFOLDS)
+                     upper.limits=rep(0, length(regressors)), relax=FALSE)
   
   mu <- predict(model, newx=as.matrix(train[,X]), type='response', s=lambda)
   coefs <- as.data.frame(as.matrix(coef(model, s=LAMBDA)))
@@ -318,8 +302,8 @@ zabi.glm <- function (train, test, label, X=c('si6'), lambda=LAMBDA) {
   mu.bin <- test$bin.p
   y <- test$y.bin[, 2]
   q50 <- qZABI(0.5, bd, mu.bin, mu.ber)
-  lower <- qZABI(0.4, bd, mu.bin, mu.ber)
-  upper <- qZABI(0.6, bd, mu.bin,  mu.ber)
+  lower <- qZABI(0.1, bd, mu.bin, mu.ber)
+  upper <- qZABI(0.9, bd, mu.bin,  mu.ber)
   test$q50 <- q50
   test$lower <- lower
   test$upper <- upper
