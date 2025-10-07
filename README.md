@@ -17,6 +17,7 @@
     │       │   └─> indicator_series.parquet ───┐
     │       │                                   │
     │       └─> 03_calculate_standardised.py    |
+    │           │    (makes SPI and SPEI)       │
     │           │                               │
     │           ├─> parameters.csv              │
     │           ├─> standardised_series.parquet ┤
