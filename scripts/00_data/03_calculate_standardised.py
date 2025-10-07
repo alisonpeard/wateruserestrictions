@@ -143,17 +143,9 @@ def prepare_indices(df, tempdir, scenario, q=None, windows=[6, 12, 24]):
     # Check order - still needed?
     df = df.sort_values(['RZ_ID', 'buffer', 'Variable', 'ensemble', 'Year', 'Month'])
 
-    # TODO: Check expected number of rows and/or count of dates - to ensure no missing values etc
-    # assert df.shape[0] == (df['RZ_ID'].nunique() * df['buffer'].nunique() * df['Variable'].nunique() * df['Y'])
-
     distribution_dfs = []
 
     for window in windows:
-
-        # Check if any months with zero precipitation - not accounted for currently
-        # if variable == 'prbc':
-        #     if df.loc[df['Value'] == 0].shape[0] > 0:
-        #         raise ValueError(f'Months with zero precipitation in dataframe: WRZ {wrz_id}, buffer {buffer}')
 
         df1 = calculate_rolling_sums(
             df, factor_columns=['buffer', 'Variable', 'ensemble', 'RZ_ID'], value_column='Value', window=window,
