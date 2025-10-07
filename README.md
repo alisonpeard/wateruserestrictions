@@ -29,8 +29,6 @@
 04_extract_monthly_restrictions.py ─────────> monthly_los_level[0-4]_melted.csv ──┘
                                                 │
                                                 └─> ts_with_levels.csv (FINAL OUTPUT)
-```
-
 Key data flows:
 
 00: Creates buffered WRZ geometries
@@ -41,3 +39,4 @@ Key data flows:
 05: Combines indicators, standardized indices, and LOS levels into final timeseries
 
 Main output: ts_with_levels.csv
+```
