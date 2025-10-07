@@ -95,7 +95,6 @@ def prepare_max_extents(datadir, tempdir):
 
     wrz = gpd.read_file(os.path.join(tempdir, 'wrz.gpkg'))
     wrz = wrz[['RZ_ID', 'geometry']].drop_duplicates()  # moved up in order of things
-    # TODO: Check why there are duplicates in the WRZ gdf
 
     basins = gpd.read_file(os.path.join(datadir, 'river_basins', 'ukcp18-uk-land-river-hires.gpkg')).to_crs(4326)
     assert basins.crs == wrz.crs

@@ -1,0 +1,115 @@
+00_make_buffers.py
+│
+├─> wrz.gpkg
+└─> wrz_buffer.gpkg
+    │
+    ├─> 01_aggregate_over_buffers.py
+    │   │
+    │   └─> aggregated_series.parquet
+    │       │
+    │       ├─> 02_calculate_indicators.py
+    │       │   │
+    │       │   ├─> thresholds.csv (ignored)
+    │       │   └─> indicator_series.parquet ───┐
+    │       │                                   │
+    │       └─> 03_calculate_standardised.py    |
+    │           │                               │
+    │           ├─> parameters.csv              │
+    │           ├─> standardised_series.parquet ┤
+    │           └─> si_plots/*.png              │
+    │                                           │
+    └─────────────────────────────────────────> 05_make_timeseries.py ────────────┐
+                                                │   (also uses monthly_los files) |
+                                                │                                 |
+04_extract_monthly_restrictions.py ─────────> monthly_los_level[0-4]_melted.csv ──┘
+                                                │
+                                                └─> ts_with_levels.csv (FINAL OUTPUT)
+
+
+Key data flows:
+
+00: Creates buffered WRZ geometries
+01: Aggregates W@H climate data (prbc, ep) over WRZ buffers
+02: Calculates drought indicators from aggregated series
+03: Standardizes variables (SPI, SPEI) from aggregated series
+04: Extracts monthly restriction levels from LOS data (independent branch)
+05: Combines indicators, standardized indices, and LOS levels into final timeseries
+
+Main output: ts_with_levels.csv
+
+------ Summary of each script ------
+00_make_buffers.py
+    Params:
+        - coordinate reference system: config['config']['crs']
+        - buffer sizes in meters: config['config']['buffer_sizes']
+
+    Inputs:
+        - WRZ shapefiles: os.path.join(config['paths']['datadir'], 'WRZ', 'WRZ.shp')
+        - WRZ codes: os.path.join(config['paths']['datadir'], 'WRZ', 'wrz_code.xlsx')
+
+    Outputs:
+        - WRZ shapefiles in GPKG: os.path.join(config['paths']["tempdir"], 'wrz.gpkg')
+        - WRZ with different buffers: os.path.join(config['paths']["tempdir"], 'wrz_buffer.gpkg')
+
+01_aggregate_over_buffers.py
+    Params:
+        - Climate scenario: config["config"]["scenario"]
+    Inputs:
+        - W@H data zip file: os.path.join(config['paths']["datadir"], 'w@h', f"{scenario}.zip")
+        - River basins data: os.path.join(config['paths']["datadir"], 'river_basins', 'ukcp18-uk-land-river-hires.gpkg')
+        - WRZ with different buffers: os.path.join(config['paths']["tempdir"], 'wrz_buffer.gpkg')
+        - WRZ shapefiles in GPKG: os.path.join(config['paths']["tempdir"], 'wrz.gpkg')
+    Outputs:
+        - Aggregated series parquet file: os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'aggregated_series.parquet')
+            _ Calculated prbc and ep from W@H data prbc and pepm under column "Variable", subset by "Variable". PRBC in mm/s to mm/d.
+            - Intersect bugger and WRZ so only uses WRZ.
+
+
+02_calculate_indicators.py
+    Inputs:
+        - Aggregated series parquet file: os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'aggregated_series.parquet')
+
+    Outputs:
+        - os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'thresholds.csv')
+        - Drought indicators parquet file: os.path.join(config['paths']["tempdir"], "indicators", {scenario}, 'indicator_series.parquet')
+    - Can ignore thresholds, this was for doing the Q50 anomalies etc.
+
+
+03_calculate_standardised.py
+    Inputs:
+        - os.path.join(config['paths']["tempdir"], {scenario}, 'aggregated_series.parquet')
+
+    Outputs:
+        - os.path.join(config['paths']["tempdir"], {scenario}, 'parameters.csv')
+        - os.path.join(config['paths']["tempdir"], {scenario}, 'standardised_series.parquet')
+        - os.path.join(config['paths']["tempdir"], {scenario}, "si_plots", "{distribution}_win{window}_{buffer}_{variable}_{ensemble}_{RZ_ID}.png")
+    - Standardised variable for both PRBC and EP (SPI and SPEI)
+
+
+04_extract_monthly_restrictions.py
+    Params:
+        - config["config"]["scenario"]
+    Inputs:
+        - os.path.join(config['paths']['datadir'], 'los', {scenario}.upper(),'National_Model__jobid_{ensemble}_nodal_globalPlotVars_selected.csv')
+        - os.path.join(config['paths']['datadir'], 'WRZ', 'wrz_code.xlsx')
+
+    Outputs:
+        - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level0_melted.csv")
+        - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level1_melted.csv")
+        - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level2_melted.csv")
+        - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level3_melted.csv")
+        - os.path.join(config['paths']['tempdir'], "los", {scenario}, "monthly_los_level4_melted.csv")
+
+05_make_timeseries.py
+    Params:
+        - config["config"]["scenario"]
+        - config["config"]["variable"]
+
+    Inputs:
+        - os.path.join(config['paths']['tempdir'], 'indicators', {scenario}, 'indicator_series.parquet')
+        - os.path.join(config['paths']['tempdir'], 'indicators', SCENARIO, 'standardised_series.parquet')
+        - os.path.join(config['paths']['tempdir'], 'los', {scenario}, f"monthly_los_level{level}_melted.csv")
+
+    Outputs:
+        - os.path.join(config['paths']['resultsdir'], 'ts_with_levels.csv')
+    - The SI Variable [ep or prbc] depends on config.json
