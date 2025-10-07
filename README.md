@@ -1,6 +1,7 @@
 # WUR indicators
 
 ## Data processing workflow
+```
 00_make_buffers.py
 │
 ├─> wrz.gpkg
@@ -27,7 +28,7 @@
 04_extract_monthly_restrictions.py ─────────> monthly_los_level[0-4]_melted.csv ──┘
                                                 │
                                                 └─> ts_with_levels.csv (FINAL OUTPUT)
-
+```
 
 Key data flows:
 
