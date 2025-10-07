@@ -7,7 +7,7 @@
     },
     "config": {
         "scenario": 2,
-        "variable": 0,
+        "variable": 1,
         "scenarios": ["hist", "nf", "ff"],
         "variables": ["ep", "prbc"],
         "uk_crs": "EPSG:27700",

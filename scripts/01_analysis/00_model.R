@@ -15,7 +15,7 @@ library(rjson) # load config
 library(ggthemes) # for plotting
 
 WRZ <- "london"
-INDICATORS <- c('si6')
+INDICATORS <- c('si12')
 TREND <- FALSE
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
 
@@ -28,6 +28,9 @@ source("utils.R")
 setwd("/Users/alison/Documents/drought-indicators/analysis/wateruserestrictions/scripts/01_analysis/../..")
 
 config <- fromJSON(file="config.json")
+
+VAR <- config$config$variables[config$config$variable+1]
+var <- paste0(VAR, "_total")
 
 res.dir <- config$paths$results
 data.dir <- paste0(res.dir, '/full_timeseries/')

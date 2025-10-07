@@ -60,13 +60,15 @@ rz_keys <- unique(rz_keys[c('rz_id', 'wrz')]) # 29 unique
 #rz_keys <- rz_keys[rz_keys$rz_id %in% valid, ]
 
 # (a) loop through all indicators for single WRZ
-WRZ <- 'ruthamford_north'
+WRZ <- 'london'
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
 RZ_ID <- RZ_IDS[[WRZ]]
-K <- 100 # bootstrap samples
+K <- 100 #100 # bootstrap samples
 windows <- c(3, 6, 12, 24) # length of lag/MA windows (in months) 
+VAR <- config$config$variables[config$config$variable+1]
+var <- paste0(VAR, "_total")
 
-INDs <- c('ep_total', 'si6', 'si12', 'si24')
+INDs <- c(var, 'si6', 'si12', 'si24')
 TREND.MODES <- c('raw')#, 'trend')
 LAG.MODES <- c('lag', 'ma')
 TYPES <- c("s")#, "t")
@@ -168,7 +170,7 @@ if(TRUE) {
           stargazer(summary, type='text')
           
           summary$rz_id <- RZ_ID
-          outdir <- paste0(res.dir, '/cv/', WRZ, '/', TREND.MODE, '/', INDICATOR.BASE, '/', LAG.MODE, '.', TYPE)
+          outdir <- paste0(res.dir, '/cv/', WRZ, '/', VAR, '/', TREND.MODE, '/', INDICATOR.BASE, '/', LAG.MODE, '.', TYPE)
           dir.create(outdir, recursive=TRUE)
           write.csv(summary, paste0(outdir, '/', scenario, '.csv'))
           print(paste0("Saved!"))
@@ -180,7 +182,7 @@ if(TRUE) {
 }
 
 # (b) loop through water resource zones for chosen combination
-INDICATOR.BASE <- 'si24'      # c('si6', 'si12', 'si24', 'ep_total')
+INDICATOR.BASE <- 'si24'      # c('si6', 'si12', 'si24', var)
 TREND.MODE <- 'raw'           # c('trend', 'raw'), raw means no decomposition
 LAG.MODE <- 'ma'              # c('lag', 'ma')
 TYPE <- 's'                   # c("s", "t", "m", "e", "r", "")
@@ -276,7 +278,7 @@ if(FALSE){
       summary$rz_id <- RZ_ID
       outdir <- paste0(res.dir, '/cv/', WRZ, '/', TREND.MODE, '/', INDICATOR.BASE, '/', LAG.MODE, '.', TYPE)
       dir.create(outdir, recursive=TRUE)
-      write.csv(summary, paste0(outdir, '/', ENSEMBLE, '.csv'))
+      write.csv(summary, paste0(outdir, '/', VAR, '_', ENSEMBLE, '.csv'))
       rz_keys[x, 'success'] <- TRUE
       print(paste0("Saved!"))
     })

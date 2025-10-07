@@ -15,6 +15,7 @@ Outputs:
 """
 #%%
 import os
+
 os.environ['USE_PYGEOS'] = '0'
 
 import pandas as pd
@@ -92,7 +93,7 @@ def main(config):
     ts = pd.merge(ts, ts_los, on=['Date', 'RZ_ID', 'ensemble'])
     
     ts = ts[[
-        'RZ_ID', 'ensemble', 'LoS', 'ep_total', 'anomaly_mean', 'deficit_mean',
+        'RZ_ID', 'ensemble', 'LoS', f'{VARIABLE}_total', 'anomaly_mean', 'deficit_mean',
         'anomaly_q50', 'deficit_q50', 'deficit_q75', 'deficit_q90',
         'si6', 'si12', 'si24'
         ]]

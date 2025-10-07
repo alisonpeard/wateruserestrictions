@@ -7,48 +7,63 @@ import pandas as pd
 import dataframe_image as dfi
 import numpy as np
 
+import utils
+
 pd.set_option('display.precision', 4)
 
-scenario = 'ff'
-wrz = ['london', 'united_utilities_grid', 'ruthamford_north'][2]
+wrz = ['london', 'united_utilities_grid', 'ruthamford_north'][0]
+
+# setup
+wd = os.path.join(os.path.dirname(__file__), "../..")
+os.chdir(wd); print(f"Working directory: {os.getcwd()}")
+config = utils.load_config()
+
+scenario = config["config"]["scenarios"][config['config']["scenario"]]
+variable = config["config"]["variables"][config['config']["variable"]]
+
+
 wd = os.path.join(os.path.expanduser("~"), "Documents", "drought-indicators", "analysis")
-datadir = os.path.join(wd, "data", "results")
+datadir = os.path.join(config["paths"]["resultsdir"])
+
 ensembledir = os.path.join(datadir, "cv", wrz)
-figdir = '/Users/alison/Documents/drought-indicators/analysis/figures'
+figdir = os.path.join(config["paths"]["figdir"])
+
+print(f"Reading data from {ensembledir}")
 
 # %%
 dfs = []
-toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', '.ep_total', '.si6', '.si12', '.si24']
+toremove = ['.trend', '.raw', '.lag.', '.ma.s', '.ma.t', f'.{variable}_total', '.si6', '.si12', '.si24']
 
 # for display
-ind_rename = {'ep_total': 'EP', 'si6': 'SI6', 'si12': 'SI12', 'si24': 'SI24'}
+ind_rename = {f'{variable}_total': variable.upper(), 'si6': 'SI6', 'si12': 'SI12', 'si24': 'SI24'}
 trend_rename = {'trend': 'Yes', 'raw': 'No'}
 lag_rename = {'lag.': 'Pointwise', 'ma.s': 'Simple MA', 'ma.t': 'Triangular MA'}
 column_rename = {'CRPS..WUR.days.': 'CRPS'}
 
 for root, dirs, files in os.walk(ensembledir):
-    for file in files:
-        if file.endswith(f"{scenario}.csv"):
-        # if file.endswith("bootstrap.csv"):
-            df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
-            df = df.replace('NA', pd.NA)
-            columns = df.columns
+    if variable in root:
+        for file in files:
+            if file.endswith(f"{scenario}.csv"):
+                print(root, file) # !
+                df = pd.read_csv(os.path.join(root, file), index_col=0, skipinitialspace=True)
+                df = df.replace('NA', pd.NA)
+                columns = df.columns
 
-            for r in toremove:
-                columns = [x.replace(r, '') for x in columns]
+                for r in toremove:
+                    columns = [x.replace(r, '') for x in columns]
 
-            df.columns = columns
-            df = df.rename(columns=column_rename)
+                df.columns = columns
+                df = df.rename(columns=column_rename)
 
-            df['Lag type'] = lag_rename[root.split('/')[-1]]
-            df['Indicator'] = ind_rename[root.split('/')[-2]]
-            df['Detrended'] = trend_rename[root.split('/')[-3]]
-            df['WRZ'] = root.split('/')[-4].title()
-            dfs.append(df)
+                df['Lag type'] = lag_rename[root.split('/')[-1]]
+                df['Indicator'] = ind_rename[root.split('/')[-2]]
+                df['Detrended'] = trend_rename[root.split('/')[-3]]
+                df['WRZ'] = root.split('/')[-5].title()
+                dfs.append(df)
 
 # %%
 def order_columns(df):
-    df['Indicator'] = pd.Categorical(df['Indicator'], categories=['EP', 'SI6', 'SI12', 'SI24'], ordered=True)
+    df['Indicator'] = pd.Categorical(df['Indicator'], categories=[variable.upper(), 'SI6', 'SI12', 'SI24'], ordered=True)
     df["Detrended"] = pd.Categorical(df["Detrended"], categories=["Yes", "No"], ordered=True)
     df = df.sort_values(['WRZ', 'Indicator', 'Detrended', 'Lag type'])
     return df
@@ -56,6 +71,8 @@ def order_columns(df):
 # %% look at scores
 df = pd.concat(dfs).reset_index(drop=True)
 df = order_columns(df)
+df.head()
+# %%
 
 df = df[df["Detrended"] == "No"].copy().drop(columns=['Detrended'])
 df = df[df["Lag type"].isin(['Pointwise', 'Simple MA'])].copy()
@@ -73,11 +90,11 @@ df_styled = df.style.background_gradient(
             precision=4
             )
 
-dfi.export(df_styled, os.path.join(figdir, f'indicators_{wrz}_{scenario}.png'),
+dfi.export(df_styled, os.path.join(figdir, f'metrics_{wrz}_{scenario}.png'),
            table_conversion='matplotlib',
            dpi=300)
 
-df_styled.to_excel(os.path.join(figdir, f'indicators_{wrz}_{scenario}.xlsx'), float_format="%.4f")
+df_styled.to_excel(os.path.join(figdir, f'metrics_{wrz}_{scenario}.xlsx'), float_format="%.4f")
 df_styled
 
 # %%
