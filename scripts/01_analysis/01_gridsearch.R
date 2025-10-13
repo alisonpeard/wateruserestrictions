@@ -60,7 +60,7 @@ rz_keys <- unique(rz_keys[c('rz_id', 'wrz')]) # 29 unique
 #rz_keys <- rz_keys[rz_keys$rz_id %in% valid, ]
 
 # (a) loop through all indicators for single WRZ
-WRZ <- 'london'
+WRZ <- 'ruthamford_north'
 RZ_IDS <- list(london=117, united_utilities_grid=122, ruthamford_north=22)
 RZ_ID <- RZ_IDS[[WRZ]]
 K <- 100 #100 # bootstrap samples

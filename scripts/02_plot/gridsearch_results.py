@@ -11,7 +11,7 @@ import utils
 
 pd.set_option('display.precision', 4)
 
-wrz = ['london', 'united_utilities_grid', 'ruthamford_north'][0]
+wrz = ['london', 'united_utilities_grid', 'ruthamford_north'][2]
 
 # setup
 wd = os.path.join(os.path.dirname(__file__), "../..")
@@ -20,7 +20,6 @@ config = utils.load_config()
 
 scenario = config["config"]["scenarios"][config['config']["scenario"]]
 variable = config["config"]["variables"][config['config']["variable"]]
-
 
 wd = os.path.join(os.path.expanduser("~"), "Documents", "drought-indicators", "analysis")
 datadir = os.path.join(config["paths"]["resultsdir"])

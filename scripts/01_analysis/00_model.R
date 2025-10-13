@@ -320,14 +320,20 @@ if (TRUE) {
   total_days <- preds$n[mask]
   predicted_probs <- preds$bin.p[mask]
   
+  
+  # Climatology 1: predict the mean proportion for every observation
+  #mean_proportion <- mean(observed_counts / total_days)
+  #climatology_probs <- rep(mean_proportion, length(observed_counts))
+  
+  # Climatology 2
+  months <- month(preds$Date)
+  preds$month <- month(preds$Date)
+  monthly_means <- aggregate(observed_counts / total_days, by = list(month = preds$month[mask]), FUN = mean)
+  names(monthly_means)[2] <- "mean_proportion"
+  climatology_probs <- monthly_means$mean_proportion[match(preds$month, monthly_means$month)]
+  
   model_crps <- crpsBI(y = observed_counts, n = total_days, mu = predicted_probs)
-  
-  # Climatology: predict the mean proportion for every observation
-  mean_proportion <- mean(observed_counts / total_days)
-  climatology_probs <- rep(mean_proportion, length(observed_counts))
-  
   climatology_crps <- crpsBI(y = observed_counts, n = total_days, mu = climatology_probs)
-  
   skill_score <- 1 - (model_crps / climatology_crps)
   
   cat("Model CRPS:", round(model_crps, 3), "days\n")
@@ -340,15 +346,17 @@ if (TRUE) {
   obs <- preds$y.ber[, 2]
   probs <- preds$ber.p
   
-  model_brier <- brier(obs, probs)
-  
   # Climatology: predict the mean proportion for every observation
+  #mean_proportion <- mean(obs > 0)
+  #climatology_probs <- rep(mean_proportion, length(obs))
+  months <- month(preds$Date)
+  preds$month <- month(preds$Date)
+  monthly_means <- aggregate(obs > 0, by = list(month = preds$month), FUN = mean)
+  names(monthly_means)[2] <- "mean_proportion"
+  climatology_probs <- monthly_means$mean_proportion[match(preds$month, monthly_means$month)]
   
-  mean_proportion <- mean(obs > 0)
-  climatology_probs <- rep(mean_proportion, length(obs))
-  
+  model_brier <- brier(obs, probs)
   climatology_brier <- brier(obs, climatology_probs)
-  
   skill_score <- 1 - (model_brier / climatology_brier)
   
   cat("Model Brier:", round(model_brier, 3), "days\n")
@@ -356,3 +364,26 @@ if (TRUE) {
   cat("Brier Skill Score:", round(100 * skill_score, 1), "%\n")
 }
 
+
+# TODO:Recall skill score for occurrence model
+# Need to do probabilities by month, not just overall
+if (TRUE) {
+  obs <- preds$y.ber[, 2]
+  probs <- preds$ber.p
+  
+  months <- month(preds$Date)
+  preds$month <- month(preds$Date)
+  monthly_means <- aggregate(obs > 0, by = list(month = preds$month), FUN = mean)
+  names(monthly_means)[2] <- "mean_proportion"
+  climatology_probs <- monthly_means$mean_proportion[match(preds$month, monthly_means$month)]
+  
+  model_recall <- recall(obs, probs > 0.5)
+
+  climatology_recall <- recall(obs, climatology_probs > 0.5)
+  
+  skill_score <- 1 - (model_recall / climatology_recall)
+  
+  cat("Model Recall:", round(model_recall, 3), "days\n")
+  cat("Climatology Recall:", round(climatology_recall, 3), "days\n") 
+  cat("Recall Skill Score:", round(100 * skill_score, 1), "%\n")
+}
